@@ -1,109 +1,102 @@
-// PackageEditActivity.kt
 package com.example.deliverybox
 
 import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import com.example.deliverybox.model.Package
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.android.material.textfield.TextInputEditText
-import com.google.android.material.button.MaterialButton
 
 class PackageEditActivity : AppCompatActivity() {
 
-    private lateinit var etTrackingNumber: TextInputEditText
-    private lateinit var etInfo: TextInputEditText
-    private lateinit var etOrigin: TextInputEditText
-    private lateinit var spinnerCourier: Spinner
-    private lateinit var spinnerCategory: Spinner
-    private lateinit var btnUpdate: MaterialButton
-    private lateinit var btnDelete: MaterialButton
-
     private lateinit var db: FirebaseFirestore
     private lateinit var boxId: String
-    private lateinit var docId: String
-    private var createdAt: Long = 0L
+    private lateinit var packageId: String
+    private var createdAt: Long = 0L  // 삭제 제한용
+
+    // 스피너 선택지
+    private val courierOptions = listOf("CJ대한통운", "한진택배", "우체국택배", "로젠택배", "쿠팡로지스틱스")
+    private val categoryOptions = listOf("의류", "전자기기", "서적", "식품", "생활용품", "기타")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_package_edit)
 
-        // UI 연결
-        etTrackingNumber = findViewById(R.id.et_edit_tracking_number)
-        etInfo = findViewById(R.id.et_edit_info)
-        etOrigin = findViewById(R.id.et_edit_origin)
-        spinnerCourier = findViewById(R.id.spinner_edit_courier)
-        spinnerCategory = findViewById(R.id.spinner_edit_category)
-        btnUpdate = findViewById(R.id.btn_update_package)
-        btnDelete = findViewById(R.id.btn_delete_package)
-
-        // Firestore
         db = FirebaseFirestore.getInstance()
 
-        // Spinner 설정
-        val courierList = listOf("CJ대한통운", "롯데택배", "한진택배", "우체국", "기타")
-        val categoryList = listOf("생활용품", "의류/잡화", "전자기기", "식품", "도서/문구", "기타")
-        spinnerCourier.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, courierList)
-        spinnerCategory.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categoryList)
-
-        // 인텐트로 전달받은 값들
+        // 인텐트로부터 boxId, packageId 받기
         boxId = intent.getStringExtra("boxId") ?: return
-        docId = intent.getStringExtra("docId") ?: return
-        createdAt = intent.getLongExtra("createdAt", 0L)
+        packageId = intent.getStringExtra("packageId") ?: return
 
-        etTrackingNumber.setText(intent.getStringExtra("trackingNumber"))
-        etInfo.setText(intent.getStringExtra("info"))
-        etOrigin.setText(intent.getStringExtra("origin"))
+        // UI 요소들 참조
+        val etTracking = findViewById<EditText>(R.id.et_edit_tracking)
+        val etInfo = findViewById<EditText>(R.id.et_edit_info)
+        val spinnerCourier = findViewById<Spinner>(R.id.spinner_courier)
+        val spinnerCategory = findViewById<Spinner>(R.id.spinner_category)
+        val etOrigin = findViewById<EditText>(R.id.et_edit_origin)
+        val btnUpdate = findViewById<Button>(R.id.btn_update)
+        val btnDelete = findViewById<Button>(R.id.btn_delete)
 
-        val courier = intent.getStringExtra("courierCompany") ?: "기타"
-        val category = intent.getStringExtra("category") ?: "기타"
-        spinnerCourier.setSelection(courierList.indexOf(courier))
-        spinnerCategory.setSelection(categoryList.indexOf(category))
+        // 스피너 어댑터 설정
+        spinnerCourier.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, courierOptions)
+        spinnerCategory.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, categoryOptions)
 
-        // 삭제 제한 (10분 이상 지난 경우 삭제 버튼 비활성화)
-        val now = System.currentTimeMillis()
-        val canDelete = now - createdAt <= 10 * 60 * 1000
-        btnDelete.isEnabled = canDelete
+        // 기존 데이터 Firestore에서 불러오기
+        db.collection("boxes").document(boxId)
+            .collection("packages").document(packageId)
+            .get()
+            .addOnSuccessListener { doc ->
+                val pkg = doc.toObject(Package::class.java)
+                if (pkg != null) {
+                    etTracking.setText(pkg.trackingNumber)
+                    etInfo.setText(pkg.info)
+                    etOrigin.setText(pkg.origin)
+                    createdAt = pkg.createdAt
+
+                    // 기존 선택값 반영
+                    spinnerCourier.setSelection(courierOptions.indexOf(pkg.courierCompany))
+                    spinnerCategory.setSelection(categoryOptions.indexOf(pkg.category))
+                }
+            }
 
         // 수정 버튼 클릭
         btnUpdate.setOnClickListener {
-            val newTrackingNumber = etTrackingNumber.text.toString().trim()
-            val newInfo = etInfo.text.toString().trim()
-            val newOrigin = etOrigin.text.toString().trim()
-            val newCourier = spinnerCourier.selectedItem.toString()
-            val newCategory = spinnerCategory.selectedItem.toString()
+            val updatedTracking = etTracking.text.toString()
+            val updatedInfo = etInfo.text.toString()
+            val updatedCourier = spinnerCourier.selectedItem.toString()
+            val updatedCategory = spinnerCategory.selectedItem.toString()
+            val updatedOrigin = etOrigin.text.toString()
 
             db.collection("boxes").document(boxId)
-                .collection("packages").document(docId)
+                .collection("packages").document(packageId)
                 .update(
                     mapOf(
-                        "trackingNumber" to newTrackingNumber,
-                        "info" to newInfo,
-                        "origin" to newOrigin,
-                        "courierCompany" to newCourier,
-                        "category" to newCategory
+                        "trackingNumber" to updatedTracking,
+                        "info" to updatedInfo,
+                        "courierCompany" to updatedCourier,
+                        "category" to updatedCategory,
+                        "origin" to updatedOrigin
                     )
                 )
                 .addOnSuccessListener {
                     Toast.makeText(this, "수정 완료", Toast.LENGTH_SHORT).show()
                     finish()
                 }
-                .addOnFailureListener {
-                    Toast.makeText(this, "수정 실패: ${it.message}", Toast.LENGTH_SHORT).show()
-                }
         }
 
-        // 삭제 버튼 클릭
+        // 삭제 버튼 클릭 (10분 이내만 허용)
         btnDelete.setOnClickListener {
-            db.collection("boxes").document(boxId)
-                .collection("packages").document(docId)
-                .delete()
-                .addOnSuccessListener {
-                    Toast.makeText(this, "삭제 완료", Toast.LENGTH_SHORT).show()
-                    finish()
-                }
-                .addOnFailureListener {
-                    Toast.makeText(this, "삭제 실패: ${it.message}", Toast.LENGTH_SHORT).show()
-                }
+            val now = System.currentTimeMillis()
+            if (now - createdAt <= 10 * 60 * 1000) {
+                db.collection("boxes").document(boxId)
+                    .collection("packages").document(packageId)
+                    .delete()
+                    .addOnSuccessListener {
+                        Toast.makeText(this, "삭제 완료", Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
+            } else {
+                Toast.makeText(this, "10분이 지나 삭제할 수 없습니다.", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }

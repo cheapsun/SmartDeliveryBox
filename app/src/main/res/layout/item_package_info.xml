@@ -1,68 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginVertical="8dp"
-    android:layout_marginHorizontal="12dp"
-    android:elevation="6dp"
-    android:radius="12dp"
-    android:padding="16dp"
-    android:background="@android:color/white">
+    android:padding="12dp">
 
-    <LinearLayout
-        android:orientation="vertical"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+    <TextView
+        android:id="@+id/tv_tracking_number"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="운송장번호"
+        android:textStyle="bold"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- 운송장번호 -->
-        <TextView
-            android:id="@+id/tv_tracking_number"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="운송장번호: 1234567890"
-            android:textStyle="bold"
-            android:textSize="18sp"
-            android:textColor="#000000"
-            android:layout_marginBottom="6dp" />
-
-        <!-- 택배사 -->
-        <TextView
-            android:id="@+id/tv_carrier"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="택배사: CJ대한통운"
-            android:textSize="14sp"
-            android:textColor="#555555"
-            android:layout_marginBottom="2dp" />
-
-        <!-- 내용 -->
-        <TextView
-            android:id="@+id/tv_info"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="내용: 스마트폰 액세서리"
-            android:textSize="14sp"
-            android:textColor="#555555"
-            android:layout_marginBottom="2dp" />
-
-        <!-- 분류 -->
-        <TextView
-            android:id="@+id/tv_category"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="분류: 전자기기"
-            android:textSize="14sp"
-            android:textColor="#555555"
-            android:layout_marginBottom="2dp" />
-
-        <!-- 발송지 -->
-        <TextView
-            android:id="@+id/tv_origin"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="발송지: 서울 강남"
-            android:textSize="14sp"
-            android:textColor="#555555" />
-
-    </LinearLayout>
-</androidx.cardview.widget.CardView>
+    <TextView
+        android:id="@+id/tv_courier_info"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="CJ대한통운 | 생활용품"
+        app:layout_constraintTop_toBottomOf="@id/tv_tracking_number"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="4dp" />
+</androidx.constraintlayout.widget.ConstraintLayout>

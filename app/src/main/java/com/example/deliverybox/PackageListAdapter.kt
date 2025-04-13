@@ -1,43 +1,42 @@
-package com.example.deliverybox
+package com.example.deliverybox.adapter
 
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.example.deliverybox.R
+import com.example.deliverybox.model.PackageItem
 
-class PackageListAdapter(
-    private val packageList: List<PackageItem>,
-    private val boxId: String,
-    private val onItemClick: (PackageItem, String) -> Unit
-) : RecyclerView.Adapter<PackageListAdapter.PackageViewHolder>() {
+class PackageAdapter(
+    private val packageList: List<PackageItem>,               // 문서 ID + 데이터 포함된 리스트
+    private val onItemClick: (PackageItem) -> Unit            // 클릭 콜백
+) : RecyclerView.Adapter<PackageAdapter.PackageViewHolder>() {
 
-    class PackageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val trackingNumberTextView: TextView = itemView.findViewById(R.id.tv_tracking_number)
-        val carrierTextView: TextView = itemView.findViewById(R.id.tv_carrier)
-        val infoTextView: TextView = itemView.findViewById(R.id.tv_info)
-        val categoryTextView: TextView = itemView.findViewById(R.id.tv_category)
-        val originTextView: TextView = itemView.findViewById(R.id.tv_origin)
+    // ViewHolder 정의
+    inner class PackageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val tvTrackingNumber: TextView = itemView.findViewById(R.id.tv_tracking_number)
+        private val tvCourierInfo: TextView = itemView.findViewById(R.id.tv_courier_info)
+
+        fun bind(item: PackageItem) {
+            val pkg = item.data
+            tvTrackingNumber.text = pkg.trackingNumber
+            tvCourierInfo.text = "${pkg.courierCompany} | ${pkg.category}"
+
+            itemView.setOnClickListener {
+                onItemClick(item)
+            }
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PackageViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_package_info, parent, false)
+            .inflate(R.layout.item_package_info, parent, false)  // ← XML 이름 맞춰서 수정
         return PackageViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: PackageViewHolder, position: Int) {
-        val item = packageList[position]
-        holder.trackingNumberTextView.text = "운송장번호: ${item.trackingNumber}"
-        holder.carrierTextView.text = "택배사: ${item.courierCompany}"
-        holder.infoTextView.text = "내용: ${item.info}"
-        holder.categoryTextView.text = "분류: ${item.category}"
-        holder.originTextView.text = "발송지: ${item.origin}"
-
-        // ✅ 아이템 클릭 시 이벤트 실행
-        holder.itemView.setOnClickListener {
-            onItemClick(item, boxId)
-        }
+        holder.bind(packageList[position])
     }
 
     override fun getItemCount(): Int = packageList.size
