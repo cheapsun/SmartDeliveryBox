@@ -97,23 +97,29 @@ class RegisterActivity : AppCompatActivity() {
                         db.collection("users").document(uid).set(userData)
                             .addOnSuccessListener {
                                 val boxRef = db.collection("boxes").document(boxId)
+                                val updates = mutableMapOf<String, Any>()
+
                                 if (isBoxFree) {
-                                    boxRef.update(
-                                        mapOf(
-                                            "ownerUid" to uid,
-                                            "ownerEmail" to email
-                                        )
-                                    )
+                                    updates["ownerUid"] = uid
+                                    updates["ownerEmail"] = email
                                 } else {
-                                    boxRef.update("sharedUserUids", FieldValue.arrayUnion(uid))
+                                    updates["sharedUserUids"] = FieldValue.arrayUnion(uid)
+                                    updates["sharedUserEmails"] = FieldValue.arrayRemove(email) // ✅ 자동 전환
                                 }
 
-                                Toast.makeText(this, "회원가입 성공!", Toast.LENGTH_SHORT).show()
-                                startActivity(Intent(this, LoginActivity::class.java))
-                                finish()
+                                boxRef.update(updates)
+                                    .addOnSuccessListener {
+                                        Toast.makeText(this, "회원가입 성공!", Toast.LENGTH_SHORT).show()
+                                        startActivity(Intent(this, LoginActivity::class.java))
+                                        finish()
+                                    }
+                                    .addOnFailureListener { e ->
+                                        auth.currentUser?.delete()
+                                        tvBoxError.text = "회원 정보 저장 실패: ${e.message}"
+                                        tvBoxError.visibility = View.VISIBLE
+                                    }
                             }
                             .addOnFailureListener { e ->
-                                // Firestore 저장 실패 → 계정 삭제
                                 auth.currentUser?.delete()
                                 tvBoxError.text = "회원 정보 저장 실패: ${e.message}"
                                 tvBoxError.visibility = View.VISIBLE

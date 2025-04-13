@@ -1,22 +1,23 @@
 package com.example.deliverybox
 
 import android.os.Bundle
+import android.util.Log
 import android.util.Patterns
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldPath
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.*
 
 class AddSharedUserActivity : AppCompatActivity() {
+    private val TAG = "SharedUserLog"
+
     private lateinit var db: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
     private lateinit var boxId: String
     private lateinit var adapter: SharedUserAdapter
-    private val sharedUsers = mutableListOf<Pair<String, String>>() // (uid, email)
+    private val sharedUsers = mutableListOf<Pair<String, String>>() // (uid or pending_key, email)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,12 +30,30 @@ class AddSharedUserActivity : AppCompatActivity() {
         val btnAdd = findViewById<Button>(R.id.btn_add_shared_user)
         val recyclerView = findViewById<RecyclerView>(R.id.shared_user_recyclerview)
 
-        boxId = intent.getStringExtra("boxId") ?: return
-        val uid = auth.currentUser?.uid ?: return
+        val passedBoxId = intent.getStringExtra("boxId")
+        if (passedBoxId.isNullOrEmpty()) {
+            Toast.makeText(this, "boxId가 전달되지 않았습니다.", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+        boxId = passedBoxId
+
+        val uid = auth.currentUser?.uid
+        if (uid.isNullOrEmpty()) {
+            Toast.makeText(this, "로그인 정보가 없습니다.", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
 
         val boxRef = db.collection("boxes").document(boxId)
 
         boxRef.get().addOnSuccessListener { doc ->
+            if (!doc.exists()) {
+                Toast.makeText(this, "해당 boxId가 존재하지 않습니다.", Toast.LENGTH_SHORT).show()
+                finish()
+                return@addOnSuccessListener
+            }
+
             val ownerUid = doc.getString("ownerUid")
             if (uid != ownerUid) {
                 Toast.makeText(this, "공유 사용자 추가 권한이 없습니다.", Toast.LENGTH_SHORT).show()
@@ -42,8 +61,8 @@ class AddSharedUserActivity : AppCompatActivity() {
                 return@addOnSuccessListener
             }
 
-            adapter = SharedUserAdapter(sharedUsers) { sharedUid ->
-                removeSharedUser(sharedUid)
+            adapter = SharedUserAdapter(sharedUsers) { identifier ->
+                removeSharedUser(identifier)
             }
 
             recyclerView.layoutManager = LinearLayoutManager(this)
@@ -58,41 +77,20 @@ class AddSharedUserActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
 
-                // 먼저 박스 문서에서 sharedUserEmails 확인
                 boxRef.get().addOnSuccessListener { boxDoc ->
                     val existingEmails = boxDoc.get("sharedUserEmails") as? List<*> ?: listOf<Any>()
-
                     if (existingEmails.contains(email)) {
                         Toast.makeText(this, "이미 등록된 이메일입니다.", Toast.LENGTH_SHORT).show()
                         return@addOnSuccessListener
                     }
 
-                    // 사용자 UID 조회
-                    db.collection("users").whereEqualTo("email", email).get()
-                        .addOnSuccessListener { snapshot ->
-                            if (snapshot.isEmpty) {
-                                Toast.makeText(this, "해당 이메일의 사용자가 없습니다.", Toast.LENGTH_SHORT).show()
-                                return@addOnSuccessListener
-                            }
-
-                            val sharedUid = snapshot.documents[0].id
-
-                            // 이메일, UID 모두 추가
-                            boxRef.update(
-                                mapOf(
-                                    "sharedUserUids" to FieldValue.arrayUnion(sharedUid),
-                                    "sharedUserEmails" to FieldValue.arrayUnion(email)
-                                )
-                            ).addOnSuccessListener {
-                                Toast.makeText(this, "공유 사용자 추가 완료", Toast.LENGTH_SHORT).show()
-                                etEmail.text.clear()
-                                loadSharedUsers()
-                            }.addOnFailureListener {
-                                Toast.makeText(this, "추가 실패: ${it.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                        .addOnFailureListener {
-                            Toast.makeText(this, "사용자 조회 실패: ${it.message}", Toast.LENGTH_SHORT).show()
+                    boxRef.update("sharedUserEmails", FieldValue.arrayUnion(email))
+                        .addOnSuccessListener {
+                            Toast.makeText(this, "공유 이메일 등록 완료", Toast.LENGTH_SHORT).show()
+                            etEmail.text.clear()
+                            loadSharedUsers()
+                        }.addOnFailureListener {
+                            Toast.makeText(this, "추가 실패: ${it.message}", Toast.LENGTH_SHORT).show()
                         }
                 }
             }
@@ -100,44 +98,89 @@ class AddSharedUserActivity : AppCompatActivity() {
     }
 
     private fun loadSharedUsers() {
+        Log.d(TAG, "공유 사용자 불러오는 중...")
         sharedUsers.clear()
         val boxRef = db.collection("boxes").document(boxId)
+
         boxRef.get().addOnSuccessListener { boxDoc ->
-            val uids = boxDoc.get("sharedUserUids") as? List<*> ?: listOf<String>()
-            if (uids.isEmpty()) {
+            val uids = (boxDoc.get("sharedUserUids") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val emails = (boxDoc.get("sharedUserEmails") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+
+            Log.d(TAG, "공유 UID: $uids, 이메일: $emails")
+
+            if (uids.isEmpty() && emails.isEmpty()) {
+                sharedUsers.add("info" to "등록된 공유 사용자가 없습니다.")
                 adapter.notifyDataSetChanged()
                 return@addOnSuccessListener
             }
 
-            db.collection("users").whereIn(FieldPath.documentId(), uids).get()
-                .addOnSuccessListener { result ->
-                    result.documents.forEach { doc ->
-                        val uid = doc.id
-                        val email = doc.getString("email") ?: ""
-                        sharedUsers.add(uid to email)
-                    }
-                    adapter.notifyDataSetChanged()
+            val uidChunks = uids.chunked(10)
+            var pending = uidChunks.size
+
+            if (pending == 0) {
+                emails.forEach { email ->
+                    sharedUsers.add("pending_$email" to "$email (가입 대기)")
                 }
+                if (sharedUsers.isEmpty()) {
+                    sharedUsers.add("info" to "등록된 공유 사용자가 없습니다.")
+                }
+                adapter.notifyDataSetChanged()
+                return@addOnSuccessListener
+            }
+
+            uidChunks.forEach { chunk ->
+                db.collection("users").whereIn(FieldPath.documentId(), chunk).get()
+                    .addOnSuccessListener { result ->
+                        result.documents.forEach { doc ->
+                            val uid = doc.id
+                            val email = doc.getString("email") ?: ""
+                            sharedUsers.add(uid to email)
+                        }
+
+                        if (--pending == 0) {
+                            emails.forEach { email ->
+                                if (sharedUsers.none { it.second.startsWith(email) }) {
+                                    sharedUsers.add("pending_$email" to "$email (가입 대기)")
+                                }
+                            }
+                            if (sharedUsers.isEmpty()) {
+                                sharedUsers.add("info" to "등록된 공유 사용자가 없습니다.")
+                            }
+                            adapter.notifyDataSetChanged()
+                        }
+                    }
+                    .addOnFailureListener {
+                        Log.e(TAG, "UID 조각 쿼리 실패: ${it.message}", it)
+                        if (--pending == 0) adapter.notifyDataSetChanged()
+                    }
+            }
         }
     }
 
-    private fun removeSharedUser(uid: String) {
+    private fun removeSharedUser(identifier: String) {
         val boxRef = db.collection("boxes").document(boxId)
 
-        // UID로 이메일 조회 후 이메일도 함께 삭제
-        db.collection("users").document(uid).get().addOnSuccessListener { userDoc ->
-            val email = userDoc.getString("email")
+        if (identifier.startsWith("pending_")) {
+            val email = identifier.removePrefix("pending_")
+            boxRef.update("sharedUserEmails", FieldValue.arrayRemove(email))
+                .addOnSuccessListener {
+                    Toast.makeText(this, "이메일 삭제 완료", Toast.LENGTH_SHORT).show()
+                    loadSharedUsers()
+                }
+        } else {
+            db.collection("users").document(identifier).get().addOnSuccessListener { userDoc ->
+                val email = userDoc.getString("email")
+                val updates = mutableMapOf<String, Any>(
+                    "sharedUserUids" to FieldValue.arrayRemove(identifier)
+                )
+                if (!email.isNullOrEmpty()) {
+                    updates["sharedUserEmails"] = FieldValue.arrayRemove(email)
+                }
 
-            val updates = mutableMapOf<String, Any>(
-                "sharedUserUids" to FieldValue.arrayRemove(uid)
-            )
-            if (!email.isNullOrEmpty()) {
-                updates["sharedUserEmails"] = FieldValue.arrayRemove(email)
-            }
-
-            boxRef.update(updates).addOnSuccessListener {
-                Toast.makeText(this, "삭제 완료", Toast.LENGTH_SHORT).show()
-                loadSharedUsers()
+                boxRef.update(updates).addOnSuccessListener {
+                    Toast.makeText(this, "공유 사용자 삭제 완료", Toast.LENGTH_SHORT).show()
+                    loadSharedUsers()
+                }
             }
         }
     }

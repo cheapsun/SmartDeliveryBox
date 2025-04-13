@@ -2,46 +2,58 @@
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="24dp">
+    android:padding="24dp"
+    tools:context=".MainActivity">
 
-    <!-- 공유 사용자 추가 버튼 -->
-    <Button
-        android:id="@+id/btn_go_add_user"
+    <!-- 🔹 버튼 묶음 (수직 정렬 & 중앙 배치) -->
+    <LinearLayout
+        android:id="@+id/layout_button_group"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="공유 사용자 추가"
-        android:background="@drawable/btn_blue_selector"
-        android:textColor="@android:color/white"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- 택배 등록 버튼 -->
-    <Button
-        android:id="@+id/btn_go_register_package"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="택배 등록"
-        android:background="@drawable/btn_blue_selector"
-        android:textColor="@android:color/white"
-        app:layout_constraintTop_toBottomOf="@id/btn_go_add_user"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp" />
+        app:layout_constraintVertical_bias="0.5">
 
-    <!-- 🔹 택배 리스트 보기 버튼 추가 -->
-    <Button
-        android:id="@+id/btn_go_package_list"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="택배 리스트"
-        android:background="@drawable/btn_blue_selector"
-        android:textColor="@android:color/white"
-        app:layout_constraintTop_toBottomOf="@id/btn_go_register_package"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp" />
+        <!-- 공유 사용자 추가 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_go_add_user"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="공유 사용자 추가"
+            android:textColor="@android:color/white"
+            android:backgroundTint="?attr/colorPrimary"
+            app:cornerRadius="12dp" />
+
+        <!-- 택배 등록 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_go_register_package"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="택배 등록"
+            android:textColor="@android:color/white"
+            android:backgroundTint="?attr/colorPrimary"
+            app:cornerRadius="12dp"
+            android:layout_marginTop="16dp" />
+
+        <!-- 택배 리스트 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_go_package_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="택배 리스트"
+            android:textColor="@android:color/white"
+            android:backgroundTint="?attr/colorPrimary"
+            app:cornerRadius="12dp"
+            android:layout_marginTop="16dp" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
