@@ -16,11 +16,16 @@ class PackageAdapter(
     inner class PackageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvTrackingNumber: TextView = itemView.findViewById(R.id.tv_tracking_number)
         private val tvCourierInfo: TextView = itemView.findViewById(R.id.tv_courier_info)
+        private val tvOrigin: TextView = itemView.findViewById(R.id.tv_origin)
+        private val tvCreated: TextView = itemView.findViewById(R.id.tv_created)
 
         fun bind(item: PackageItem) {
             val pkg = item.data
+
             tvTrackingNumber.text = pkg.trackingNumber
             tvCourierInfo.text = "${pkg.courierCompany} | ${pkg.category}"
+            tvOrigin.text = pkg.origin
+            tvCreated.text = "${pkg.createdDate} ${pkg.createdTime}"
 
             itemView.setOnClickListener {
                 onItemClick(item)
@@ -30,7 +35,7 @@ class PackageAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PackageViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_package_info, parent, false)  // XML 파일명 확인 필요
+            .inflate(R.layout.item_package_info, parent, false)
         return PackageViewHolder(view)
     }
 
