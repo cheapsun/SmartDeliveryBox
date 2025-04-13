@@ -8,15 +8,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.deliverybox.adapter.PackageAdapter
 import com.example.deliverybox.model.Package
+import com.example.deliverybox.model.PackageItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-
-// 문서 ID와 실제 패키지 데이터를 함께 담는 클래스
-data class PackageItem(
-    val id: String,
-    val data: Package
-)
 
 class PackageListActivity : AppCompatActivity() {
 
@@ -35,7 +30,6 @@ class PackageListActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.recycler_view_packages)
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        // 현재 로그인한 사용자 UID로부터 boxId 가져오기
         val uid = auth.currentUser?.uid
         if (uid != null) {
             db.collection("users").document(uid).get()
@@ -49,7 +43,6 @@ class PackageListActivity : AppCompatActivity() {
         }
     }
 
-    // 해당 boxId의 패키지 리스트 불러오기
     private fun loadPackages() {
         db.collection("boxes").document(boxId)
             .collection("packages")
@@ -64,11 +57,10 @@ class PackageListActivity : AppCompatActivity() {
                     packageList.add(PackageItem(id, pkg))
                 }
 
-                // 어댑터 연결 + 아이템 클릭 시 수정화면으로 이동
-                adapter = PackageAdapter(packageList) { selectedItem ->
+                adapter = PackageAdapter(packageList.toList()) { selectedItem ->
                     val intent = Intent(this, PackageEditActivity::class.java)
                     intent.putExtra("boxId", boxId)
-                    intent.putExtra("packageId", selectedItem.id)  // 문서 ID 전달
+                    intent.putExtra("packageId", selectedItem.id)
                     startActivity(intent)
                 }
 

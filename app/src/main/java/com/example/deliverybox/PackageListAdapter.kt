@@ -9,11 +9,10 @@ import com.example.deliverybox.R
 import com.example.deliverybox.model.PackageItem
 
 class PackageAdapter(
-    private val packageList: List<PackageItem>,               // 문서 ID + 데이터 포함된 리스트
-    private val onItemClick: (PackageItem) -> Unit            // 클릭 콜백
+    private val packageList: List<PackageItem>,
+    private val onItemClick: (PackageItem) -> Unit
 ) : RecyclerView.Adapter<PackageAdapter.PackageViewHolder>() {
 
-    // ViewHolder 정의
     inner class PackageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvTrackingNumber: TextView = itemView.findViewById(R.id.tv_tracking_number)
         private val tvCourierInfo: TextView = itemView.findViewById(R.id.tv_courier_info)
@@ -31,7 +30,7 @@ class PackageAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PackageViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_package_info, parent, false)  // ← XML 이름 맞춰서 수정
+            .inflate(R.layout.item_package_info, parent, false)  // XML 파일명 확인 필요
         return PackageViewHolder(view)
     }
 
