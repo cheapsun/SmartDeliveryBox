@@ -1,111 +1,120 @@
 package com.example.deliverybox
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
-import android.view.View
-import android.view.inputmethod.InputMethodManager
-import android.widget.*
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.example.deliverybox.model.UserData
+import com.example.deliverybox.utils.FirestoreHelper
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
-import android.util.Log
 
 class LoginActivity : AppCompatActivity() {
+
     private lateinit var auth: FirebaseAuth
-    private lateinit var db: FirebaseFirestore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_login)
 
-        try {
-            setContentView(R.layout.activity_login)
+        auth = FirebaseAuth.getInstance()
 
-            auth = FirebaseAuth.getInstance()
-            db = FirebaseFirestore.getInstance()
+        val etEmail = findViewById<EditText>(R.id.et_email)
+        val etPassword = findViewById<EditText>(R.id.et_password)
+        val btnLogin = findViewById<Button>(R.id.btn_login)
+        val tvSignupFull = findViewById<TextView>(R.id.tv_signup_full)
+        val tvForgotPassword = findViewById<TextView>(R.id.tv_forgot_password)
 
-            val etEmail = findViewById<EditText>(R.id.et_email)
-            val etPassword = findViewById<EditText>(R.id.et_password)
-            val btnLogin = findViewById<Button>(R.id.btn_login)
-            val btnRegister = findViewById<Button>(R.id.btn_go_to_register)
-            val tvLoginError = findViewById<TextView>(R.id.tv_login_error)
+        setupLoginButtonState(etEmail, etPassword, btnLogin)
 
-            tvLoginError.visibility = View.GONE
+        btnLogin.setOnClickListener {
+            val email = etEmail.text.toString().trim()
+            val password = etPassword.text.toString().trim()
 
-            btnRegister.setOnClickListener {
-                startActivity(Intent(this, RegisterActivity::class.java))
-            }
-
-            btnLogin.setOnClickListener {
-                // 키보드 숨기기
-                currentFocus?.let {
-                    val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                    imm.hideSoftInputFromWindow(it.windowToken, 0)
-                }
-
-                val email = etEmail.text.toString().trim()
-                val password = etPassword.text.toString()
-                tvLoginError.visibility = View.GONE
-
-                if (email.isEmpty() || password.isEmpty()) {
-                    tvLoginError.text = "이메일과 비밀번호를 모두 입력해주세요."
-                    tvLoginError.visibility = View.VISIBLE
-                    return@setOnClickListener
-                }
-
+            if (email.isNotEmpty() && password.isNotEmpty()) {
                 auth.signInWithEmailAndPassword(email, password)
-                    .addOnSuccessListener {
-                        val uid = auth.currentUser?.uid ?: return@addOnSuccessListener
+                    .addOnSuccessListener { result ->
+                        val uid = result.user?.uid ?: return@addOnSuccessListener
+                        updateFcmToken(uid)
 
-                        // FCM 토큰 저장
-                        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-                            db.collection("users").document(uid)
-                                .update("fcmToken", token)
+                        // ✅ Firestore 사용자 데이터 가져오기
+                        FirestoreHelper.getUserData(uid) { userData ->
+                            if (userData != null) {
+                                Toast.makeText(this, "로그인 성공!", Toast.LENGTH_SHORT).show()
+                                startActivity(Intent(this, MainActivity::class.java))
+                                finish()
+                            } else {
+                                Toast.makeText(this, "사용자 정보 불러오기 실패", Toast.LENGTH_SHORT).show()
+                            }
                         }
-
-                        // 사용자 정보 조회
-                        db.collection("users").document(uid).get()
-                            .addOnSuccessListener { userDoc ->
-                                val boxId = userDoc.getString("boxId")
-                                if (boxId.isNullOrEmpty()) {
-                                    tvLoginError.text = "연결된 택배함 정보가 없습니다."
-                                    tvLoginError.visibility = View.VISIBLE
-                                    return@addOnSuccessListener
-                                }
-
-                                // 박스 권한 확인
-                                db.collection("boxes").document(boxId).get()
-                                    .addOnSuccessListener { boxDoc ->
-                                        val ownerUid = boxDoc.getString("ownerUid")
-                                        val sharedUids = boxDoc.get("sharedUserUids") as? List<*> ?: emptyList<String>()
-
-                                        if (uid == ownerUid || sharedUids.contains(uid)) {
-                                            startActivity(Intent(this, MainActivity::class.java))
-                                            finish()
-                                        } else {
-                                            tvLoginError.text = "해당 택배함에 대한 접근 권한이 없습니다."
-                                            tvLoginError.visibility = View.VISIBLE
-                                        }
-                                    }
-                                    .addOnFailureListener {
-                                        tvLoginError.text = "택배함 정보 불러오기 실패: ${it.message}"
-                                        tvLoginError.visibility = View.VISIBLE
-                                    }
-                            }
-                            .addOnFailureListener {
-                                tvLoginError.text = "사용자 정보 불러오기 실패: ${it.message}"
-                                tvLoginError.visibility = View.VISIBLE
-                            }
                     }
-                    .addOnFailureListener {
-                        tvLoginError.text = "로그인 실패: 이메일 또는 비밀번호를 확인해주세요."
-                        tvLoginError.visibility = View.VISIBLE
+                    .addOnFailureListener { e ->
+                        Toast.makeText(this, "로그인 실패: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
             }
-
-        } catch (e: Exception) {
-            Log.e("LoginActivity", "🔥 로그인 액티비티에서 예외 발생: ${e.message}", e)
-            Toast.makeText(this, "에러 발생: ${e.message}", Toast.LENGTH_LONG).show()
         }
+
+        setSignupText(tvSignupFull)
+
+        tvSignupFull.setOnClickListener {
+            startActivity(Intent(this, SignupEmailActivity::class.java))
+        }
+
+        tvForgotPassword.setOnClickListener {
+            Toast.makeText(this, "비밀번호 찾기 기능은 추후 지원됩니다.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun setupLoginButtonState(
+        emailField: EditText,
+        passwordField: EditText,
+        loginButton: Button
+    ) {
+        val watcher = object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val email = emailField.text.toString().trim()
+                val password = passwordField.text.toString().trim()
+                loginButton.isEnabled = email.isNotEmpty() && password.isNotEmpty()
+                if (loginButton.isEnabled) {
+                    loginButton.setBackgroundColor(Color.parseColor("#448AFF")) // 진한 파란색
+                } else {
+                    loginButton.setBackgroundColor(Color.parseColor("#AABEFF")) // 연한 파란색
+                }
+            }
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        }
+        emailField.addTextChangedListener(watcher)
+        passwordField.addTextChangedListener(watcher)
+    }
+
+    private fun updateFcmToken(uid: String) {
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            FirestoreHelper.updateFcmToken(uid, token)
+        }
+    }
+
+    private fun setSignupText(textView: TextView) {
+        val fullText = "계정이 없으신가요? 가입하기"
+        val spannableString = SpannableString(fullText)
+        val startIndex = fullText.indexOf("가입하기")
+        val endIndex = startIndex + "가입하기".length
+
+        spannableString.setSpan(
+            ForegroundColorSpan(Color.parseColor("#007BFF")),
+            startIndex,
+            endIndex,
+            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+
+        textView.text = spannableString
     }
 }

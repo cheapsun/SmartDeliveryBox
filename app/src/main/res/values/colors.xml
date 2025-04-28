@@ -10,6 +10,9 @@
     <color name="gray">#888888</color>
     <color name="gray_background">#F5F5F5</color>
 
+    <color name="teal_700">#018786</color>  <!-- 혹은 원하는 색상 -->
+
+
 
     <color name="blue_600">#0077c8</color>  <!-- 기본 파란색 -->
     <color name="blue_800">#005fa3</color>  <!-- 눌렀을 때 -->

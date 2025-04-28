@@ -2,74 +2,70 @@
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
-    tools:context=".AddSharedUserActivity">
+    android:background="#F5F5F5"
+    android:padding="16dp">
 
-    <!-- 📌 제목 + 입력 + 버튼 묶음 (위쪽 정렬) -->
-    <LinearLayout
-        android:id="@+id/layout_input_section"
-        android:layout_width="0dp"
+    <!-- 툴바 -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar_add_shared_user"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#F5F5F5"
+        app:contentInsetStartWithNavigation="0dp"
+        app:title=""
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- ✅ Toolbar 안에 제목 추가 -->
+        <TextView
+            android:id="@+id/toolbar_title"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:text="공유 사용자 추가"
+            android:gravity="center"
+            android:textAlignment="center"
+            android:textColor="#000000"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+    </androidx.appcompat.widget.Toolbar>
+
+    <!-- 초대할 이메일 입력 -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/layout_email"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center_horizontal"
-        app:layout_constraintTop_toTopOf="parent"
+        android:hint="초대받을 사람의 이메일을 입력하세요"
+        android:layout_marginTop="32dp"
+        app:layout_constraintTop_toBottomOf="@id/toolbar_add_shared_user"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- 제목 -->
-        <TextView
-            android:id="@+id/tv_title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="공유 사용자"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="@android:color/black"
-            android:layout_marginTop="32dp"
-            android:layout_marginBottom="16dp" />
-
-        <!-- 이메일 입력 -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/shared_email_layout"
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/et_email"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="공유 사용자 이메일"
-            android:layout_marginBottom="12dp">
+            android:inputType="textEmailAddress"/>
+    </com.google.android.material.textfield.TextInputLayout>
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_shared_email"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textEmailAddress" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- 추가 버튼 -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_add_shared_user"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="추가"
-            android:textColor="@android:color/white"
-            android:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="12dp" />
-    </LinearLayout>
-
-    <!-- 공유 사용자 리스트 -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/shared_user_recyclerview"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
+    <!-- 초대 메시지 입력 -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/layout_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="초대 메시지를 입력하세요 (선택)"
         android:layout_marginTop="24dp"
-        android:clipToPadding="false"
-        android:paddingBottom="8dp"
-        android:contentDescription="공유 사용자 목록"
-        app:layout_constraintTop_toBottomOf="@id/layout_input_section"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layout_email"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        tools:listitem="@layout/item_shared_user" />
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/et_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minLines="3"
+            android:gravity="top|start"
+            android:inputType="textMultiLine"/>
+    </com.google.android.material.textfield.TextInputLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

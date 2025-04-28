@@ -47,4 +47,9 @@
     <string name="shared_user_not_found">해당 이메일의 사용자를 찾을 수 없습니다.</string>
     <string name="shared_user_no_permission">공유 사용자 추가 권한이 없습니다.</string>
     <string name="shared_user_input_email">이메일을 입력해주세요.</string>
+
+    <!-- 홈 화면 추가용 -->
+    <string name="empty_illustration">택배함 없음 일러스트</string>
+    <string name="home_empty_message">택배함을 추가하고 스마트한 관리를 시작하세요!</string>
+    <string name="home_add_box_button">택배함 추가</string>
 </resources>
