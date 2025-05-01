@@ -1,138 +1,105 @@
-package com.example.deliverybox.ui.home
+package com.example.deliverybox
 
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.*
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageButton
-import android.widget.TextView
-import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.deliverybox.R
-import com.example.deliverybox.adapter.BoxAdapter
-import com.example.deliverybox.model.Box
-import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.example.deliverybox.adapter.BoxListAdapter
+import com.example.deliverybox.databinding.FragmentHomeBinding
+import com.example.deliverybox.model.BoxInfo
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.example.deliverybox.dialog.RegisterBoxMethodDialogFragment
+
+
 
 class HomeFragment : Fragment() {
 
-    private lateinit var recyclerViewBoxes: RecyclerView
-    private lateinit var cardEmptyBox: View
-    private lateinit var db: FirebaseFirestore
-    private lateinit var auth: FirebaseAuth
+    private var _binding: FragmentHomeBinding? = null
+    private val binding get() = _binding!!
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-    }
+    private lateinit var adapter: BoxListAdapter
+    private val boxList = mutableListOf<BoxInfo>()
+
+    private val auth by lazy { FirebaseAuth.getInstance() }
+    private val db by lazy { FirebaseFirestore.getInstance() }
+
+    private val registerBoxLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (it.resultCode == android.app.Activity.RESULT_OK) {
+                loadBoxList()
+            }
+        }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        val view = inflater.inflate(R.layout.fragment_home, container, false)
-
-        db = FirebaseFirestore.getInstance()
-        auth = FirebaseAuth.getInstance()
-
-        recyclerViewBoxes = view.findViewById(R.id.recycler_view_boxes)
-        cardEmptyBox = view.findViewById(R.id.card_empty_box)
-
-        recyclerViewBoxes.layoutManager = LinearLayoutManager(requireContext())
-
-        val btnAddBoxCenter = view.findViewById<Button>(R.id.btn_add_box_center)
-        btnAddBoxCenter.setOnClickListener {
-            showRegisterBoxMethodDialog()
-        }
-
-        val btnAddBox = view.findViewById<ImageButton>(R.id.btn_add_box)
-        btnAddBox.setOnClickListener {
-            showRegisterBoxMethodDialog()  // 🔥 ➕ 버튼 클릭 시 바로 BottomSheetDialog 띄우기
-        }
-
-        val toolbar = view.findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar_home)
-        (requireActivity() as AppCompatActivity).setSupportActionBar(toolbar)
-
-        loadBoxes()
-
-        return view
+    ): View {
+        _binding = FragmentHomeBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
-    private fun showRegisterBoxMethodDialog() {
-        val dialog = BottomSheetDialog(requireContext())
-        val view = layoutInflater.inflate(R.layout.dialog_register_box_method, null)
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
 
-        val cardManual = view.findViewById<View>(R.id.card_manual_register)
-        val cardQr = view.findViewById<View>(R.id.card_qr_register)
-        val btnCancel = view.findViewById<Button>(R.id.btn_cancel)
-        val btnConfirm = view.findViewById<Button>(R.id.btn_confirm)
+        adapter = BoxListAdapter(boxList)
+        binding.recyclerViewBoxes.layoutManager = LinearLayoutManager(requireContext())
+        binding.recyclerViewBoxes.adapter = adapter
 
-        var selectedMethod: String? = null
-
-        cardManual.setOnClickListener {
-            selectedMethod = "manual"
-            cardManual.setBackgroundResource(R.drawable.rounded_background)
-            cardQr.setBackgroundResource(android.R.color.transparent)
+        binding.btnEmptyAddBox.setOnClickListener {
+            showRegisterBoxDialog()
         }
 
-        cardQr.setOnClickListener {
-            selectedMethod = "qr"
-            cardQr.setBackgroundResource(R.drawable.rounded_background)
-            cardManual.setBackgroundResource(android.R.color.transparent)
-        }
-
-        btnCancel.setOnClickListener {
-            dialog.dismiss()
-        }
-
-        btnConfirm.setOnClickListener {
-            dialog.dismiss()
-            when (selectedMethod) {
-                "manual" -> {
-                    // TODO: RegisterBoxActivity 이동 구현 예정
-                }
-                "qr" -> {
-                    Toast.makeText(requireContext(), "QR 등록 기능 준비 중입니다.", Toast.LENGTH_SHORT).show()
-                }
-                else -> {
-                    Toast.makeText(requireContext(), "등록 방법을 선택해주세요.", Toast.LENGTH_SHORT).show()
-                }
+        binding.toolbarHome.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.menu_add_box) {
+                showRegisterBoxDialog()
+                true
+            } else {
+                false
             }
         }
 
-        dialog.setContentView(view)
-        dialog.show()
+        loadBoxList()
     }
 
-    private fun loadBoxes() {
-        db.collection("boxes")
-            .whereEqualTo("ownerUid", auth.currentUser?.uid)
-            .get()
-            .addOnSuccessListener { result ->
-                val boxList = mutableListOf<Box>()
-                for (document in result) {
-                    val boxId = document.id
-                    val boxName = document.getString("boxName") ?: "이름 없음"
-                    boxList.add(Box(boxId, boxName))
-                }
+    private fun showRegisterBoxDialog() {
+        val dialog = RegisterBoxMethodDialogFragment()
+        dialog.setOnRegisterBoxSelectedListener {
+            val intent = Intent(requireContext(), RegisterBoxActivity::class.java)
+            registerBoxLauncher.launch(intent)
+        }
+        dialog.show(parentFragmentManager, "RegisterBoxMethodDialog")
+    }
 
-                if (boxList.isEmpty()) {
-                    cardEmptyBox.visibility = View.VISIBLE
-                    recyclerViewBoxes.visibility = View.GONE
+    private fun loadBoxList() {
+        val userUid = auth.currentUser?.uid ?: return
+        db.collection("users").document(userUid).get()
+            .addOnSuccessListener { document ->
+                val boxAliases = document.get("boxAliases") as? Map<String, String> ?: emptyMap()
+                boxList.clear()
+
+                if (boxAliases.isEmpty()) {
+                    binding.layoutEmpty.visibility = View.VISIBLE
+                    binding.recyclerViewBoxes.visibility = View.GONE
                 } else {
-                    cardEmptyBox.visibility = View.GONE
-                    recyclerViewBoxes.visibility = View.VISIBLE
-                    recyclerViewBoxes.adapter = BoxAdapter(boxList)
+                    boxList.addAll(boxAliases.map { BoxInfo(it.key, it.value) })
+                    adapter.notifyDataSetChanged()
+                    binding.layoutEmpty.visibility = View.GONE
+                    binding.recyclerViewBoxes.visibility = View.VISIBLE
                 }
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(requireContext(), "박스 불러오기 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+            .addOnFailureListener {
+                binding.layoutEmpty.visibility = View.VISIBLE
+                binding.recyclerViewBoxes.visibility = View.GONE
             }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

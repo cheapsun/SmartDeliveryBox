@@ -8,7 +8,7 @@ import android.widget.*
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 
-class SharedUserAdapter(
+class   SharedUserAdapter(
     private val userList: List<Pair<String, String>>,
     private val onDeleteClick: (String) -> Unit
 ) : RecyclerView.Adapter<SharedUserAdapter.ViewHolder>() {

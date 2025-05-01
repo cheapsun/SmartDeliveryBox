@@ -1,42 +1,37 @@
 package com.example.deliverybox
 
-import android.content.Intent
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
+import android.util.Patterns
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.textfield.TextInputEditText
+import com.example.deliverybox.databinding.ActivityAddSharedUserBinding
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class AddSharedUserActivity : AppCompatActivity() {
 
-    private lateinit var etEmail: TextInputEditText
-    private lateinit var etMessage: TextInputEditText
-    private var isEmailValid: Boolean = false
+    private lateinit var binding: ActivityAddSharedUserBinding
+    private lateinit var db: FirebaseFirestore
+    private lateinit var auth: FirebaseAuth
+    private lateinit var currentBoxId: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_add_shared_user)
+        binding = ActivityAddSharedUserBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        etEmail = findViewById(R.id.et_email)
-        etMessage = findViewById(R.id.et_message)
+        db = FirebaseFirestore.getInstance()
+        auth = FirebaseAuth.getInstance()
 
-        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar_add_shared_user)
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.setDisplayShowTitleEnabled(false)
-
-        toolbar.setNavigationOnClickListener {
-            onBackPressedDispatcher.onBackPressed()
+        // 툴바 뒤로가기
+        binding.toolbarAddSharedUser.setNavigationOnClickListener {
+            finish()
         }
 
-        val toolbarTitle = findViewById<TextView>(R.id.toolbar_title)
-        toolbarTitle.text = "공유 사용자 추가"
-
-        setupEmailValidation()
+        // 선택된 박스 ID 불러오기
+        fetchSelectedBoxId()
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -44,52 +39,69 @@ class AddSharedUserActivity : AppCompatActivity() {
         return true
     }
 
-    override fun onPrepareOptionsMenu(menu: Menu?): Boolean {
-        menu?.findItem(R.id.action_send)?.isEnabled = isEmailValid
-        return super.onPrepareOptionsMenu(menu)
-    }
-
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_send -> {
-                sendInvite()
-                true
+                val email = binding.etEmail.text.toString().trim()
+                if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    Toast.makeText(this, "올바른 이메일을 입력하세요.", Toast.LENGTH_SHORT).show()
+                    false
+                } else {
+                    checkEmailAndAddUser(email)
+                    true
+                }
             }
             else -> super.onOptionsItemSelected(item)
         }
     }
 
-    private fun setupEmailValidation() {
-        etEmail.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {
-                val email = s.toString().trim()
-                isEmailValid = email.isNotEmpty() && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
-                invalidateOptionsMenu()
+    private fun fetchSelectedBoxId() {
+        val userUid = auth.currentUser?.uid ?: return
+        db.collection("users").document(userUid).get()
+            .addOnSuccessListener { doc ->
+                currentBoxId = doc.getString("selectedBoxId") ?: ""
+                if (currentBoxId.isEmpty()) {
+                    Toast.makeText(this, "선택된 택배함이 없습니다.", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
             }
-
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        })
+            .addOnFailureListener {
+                Toast.makeText(this, "박스 정보를 불러오지 못했습니다.", Toast.LENGTH_SHORT).show()
+                finish()
+            }
     }
 
-    private fun sendInvite() {
-        val email = etEmail.text.toString().trim()
-        val message = etMessage.text.toString().trim()
-
-        if (email.isEmpty()) {
-            Toast.makeText(this, "이메일을 입력하세요.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            Toast.makeText(this, "올바른 이메일 형식이 아닙니다.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        // 🔹 초대 성공 처리
-        val resultIntent = Intent()
-        resultIntent.putExtra("invite_email", email)  // ✅ 이메일을 결과로 전달
-        setResult(RESULT_OK, resultIntent)
-        finish()
+    private fun checkEmailAndAddUser(email: String) {
+        db.collection("users")
+            .whereEqualTo("email", email)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                if (snapshot.isEmpty) {
+                    Toast.makeText(this, "존재하지 않는 이메일입니다.", Toast.LENGTH_SHORT).show()
+                    return@addOnSuccessListener
+                }
+                val targetUid = snapshot.documents.first().id
+                db.collection("boxes").document(currentBoxId).get()
+                    .addOnSuccessListener { boxDoc ->
+                        val sharedList = boxDoc.get("sharedUserUids") as? List<*> ?: emptyList<String>()
+                        if (sharedList.contains(targetUid)) {
+                            Toast.makeText(this, "이미 추가된 사용자입니다.", Toast.LENGTH_SHORT).show()
+                            return@addOnSuccessListener
+                        }
+                        db.collection("boxes").document(currentBoxId)
+                            .update("sharedUserUids", sharedList + targetUid)
+                            .addOnSuccessListener {
+                                Toast.makeText(this, "공유 사용자 추가 완료", Toast.LENGTH_SHORT).show()
+                                setResult(RESULT_OK)
+                                finish()
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(this, "추가에 실패했습니다.", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "이메일 확인 실패", Toast.LENGTH_SHORT).show()
+            }
     }
 }

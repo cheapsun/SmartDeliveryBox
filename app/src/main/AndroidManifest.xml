@@ -14,8 +14,11 @@
         android:theme="@style/Theme.DeliveryBox"
         tools:targetApi="31">
         <activity
-        android:name=".ui.box.BoxDetailActivity"
-        android:exported="false" />
+            android:name=".RegisterBoxActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.box.BoxDetailActivity"
+            android:exported="false" />
         <activity
             android:name=".SharedUserManageActivity"
             android:exported="false" />
