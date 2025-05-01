@@ -7,27 +7,30 @@
     android:background="#F5F5F5"
     android:padding="16dp">
 
-    <!-- 툴바 -->
+    <!-- 툴바 (뒤로가기만 포함) -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar_shared_user"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="#F5F5F5"
         app:contentInsetStartWithNavigation="0dp"
+        app:navigationIcon="@drawable/ic_baseline_arrow_back_24"
         app:title=""
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toTopOf="parent" />
 
-        <TextView
-            android:id="@+id/toolbar_title"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:text="공유 사용자 관리"
-            android:gravity="center"
-            android:textAlignment="center"
-            android:textColor="#000000"
-            android:textSize="18sp"
-            android:textStyle="bold"/>
-    </androidx.appcompat.widget.Toolbar>
+    <!-- 중앙 제목 -->
+    <TextView
+        android:id="@+id/toolbar_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="공유 사용자 관리"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#000000"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="12dp" />
 
     <!-- 회원 안내 카드 -->
     <androidx.cardview.widget.CardView
@@ -108,7 +111,7 @@
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- 비어있을 때 보여줄 안내 문구 -->
+    <!-- 안내 문구 -->
     <TextView
         android:id="@+id/tv_empty_message"
         android:layout_width="match_parent"
@@ -134,5 +137,4 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
-
 </androidx.constraintlayout.widget.ConstraintLayout>

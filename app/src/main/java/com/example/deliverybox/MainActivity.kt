@@ -3,39 +3,49 @@ package com.example.deliverybox
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
-import com.google.android.material.bottomnavigation.BottomNavigationView
-import com.example.deliverybox.ui.home.HomeFragment
+import com.example.deliverybox.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var bottomNavigationView: BottomNavigationView
+    private lateinit var binding: ActivityMainBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        // BottomNavigationView를 findViewById로 연결
-        bottomNavigationView = findViewById(R.id.bottom_navigation)
+        replaceFragment(HomeFragment())  // 처음에 HomeFragment 띄우기
 
-        // 첫 화면 기본 HomeFragment 띄우기
-        replaceFragment(HomeFragment())
-
-        // 탭 선택 리스너 설정
-        bottomNavigationView.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> replaceFragment(HomeFragment())
-                R.id.nav_package -> replaceFragment(PackageFragment())
-                R.id.nav_notification -> replaceFragment(NotificationFragment())
-                R.id.nav_doorlock -> replaceFragment(DoorlockFragment())
-                R.id.nav_setting -> replaceFragment(SettingFragment())
+        binding.bottomNavigation.setOnItemSelectedListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.menu_home -> {
+                    replaceFragment(HomeFragment())
+                    true
+                }
+                R.id.menu_package -> {
+                    replaceFragment(PackageFragment())
+                    true
+                }
+                R.id.menu_notification -> {
+                    replaceFragment(NotificationFragment())
+                    true
+                }
+                R.id.menu_doorlock -> {
+                    replaceFragment(DoorlockFragment())
+                    true
+                }
+                R.id.menu_setting -> {
+                    replaceFragment(SettingFragment())
+                    true
+                }
+                else -> false
             }
-            true
         }
     }
 
     private fun replaceFragment(fragment: Fragment) {
         supportFragmentManager.beginTransaction()
-            .replace(R.id.container_fragment, fragment)
+            .replace(R.id.frameLayout, fragment)
             .commit()
     }
 }

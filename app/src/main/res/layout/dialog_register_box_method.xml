@@ -17,7 +17,7 @@
         android:textSize="18sp"
         android:textColor="#000000"
         android:textStyle="bold"
-        android:layout_gravity="center_horizontal" />
+        android:layout_gravity="center_horizontal"/>
 
     <!-- 수동 등록 카드 -->
     <androidx.cardview.widget.CardView
@@ -51,7 +51,7 @@
                 android:text="수동으로 등록"
                 android:textSize="16sp"
                 android:textColor="#333333"
-                android:layout_marginStart="12dp" />
+                android:layout_marginStart="12dp"/>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
@@ -87,7 +87,7 @@
                 android:text="QR 코드로 등록"
                 android:textSize="16sp"
                 android:textColor="#333333"
-                android:layout_marginStart="12dp" />
+                android:layout_marginStart="12dp"/>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
@@ -102,22 +102,22 @@
 
         <Button
             android:id="@+id/btn_cancel"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="취소"
             android:backgroundTint="#E0E0E0"
             android:textColor="#333333"
-            android:layout_marginEnd="8dp" />
+            android:layout_marginEnd="8dp"/>
 
         <Button
             android:id="@+id/btn_confirm"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="확인"
             android:backgroundTint="#6A8DFF"
-            android:textColor="@android:color/white" />
+            android:textColor="@android:color/white"/>
     </LinearLayout>
 
 </LinearLayout>

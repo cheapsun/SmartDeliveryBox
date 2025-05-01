@@ -5,21 +5,15 @@ import android.os.Bundle
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
-import androidx.cardview.widget.CardView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.deliverybox.databinding.ActivitySharedUserManageBinding
 
 class SharedUserManageActivity : AppCompatActivity() {
 
-    private lateinit var toolbar: Toolbar
-    private lateinit var recyclerView: RecyclerView
+    private lateinit var binding: ActivitySharedUserManageBinding
     private lateinit var adapter: SharedUserAdapter
-    private lateinit var tvMemberTitle: TextView
-    private lateinit var inviteMemberCard: CardView
-    private lateinit var tvEmptyMessage: TextView
-
-    private val sharedUsers = mutableListOf<Pair<String, String>>()  // 🔥 빈 리스트로 안전 초기화
+    private val sharedUsers = mutableListOf<Pair<String, String>>()
 
     companion object {
         private const val REQUEST_CODE_ADD_USER = 1001
@@ -27,20 +21,12 @@ class SharedUserManageActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_shared_user_manage)
+        binding = ActivitySharedUserManageBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        toolbar = findViewById(R.id.toolbar_shared_user)
-        tvMemberTitle = findViewById(R.id.tv_member_title)
-        recyclerView = findViewById(R.id.recycler_view_members)
-        inviteMemberCard = findViewById(R.id.layout_invite_member)
-        tvEmptyMessage = findViewById(R.id.tv_empty_message)
-
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.setDisplayShowTitleEnabled(false)
-
-        toolbar.setNavigationOnClickListener {
-            onBackPressedDispatcher.onBackPressed()
+        // 툴바 설정
+        binding.toolbarSharedUser.setNavigationOnClickListener {
+            finish()
         }
 
         setupRecyclerView()
@@ -53,12 +39,12 @@ class SharedUserManageActivity : AppCompatActivity() {
         adapter = SharedUserAdapter(sharedUsers) { uidOrKey ->
             deleteUser(uidOrKey)
         }
-        recyclerView.layoutManager = LinearLayoutManager(this)
-        recyclerView.adapter = adapter
+        binding.recyclerViewMembers.layoutManager = LinearLayoutManager(this)
+        binding.recyclerViewMembers.adapter = adapter
     }
 
     private fun setupListeners() {
-        inviteMemberCard.setOnClickListener {
+        binding.layoutInviteMember.setOnClickListener {
             val intent = Intent(this, AddSharedUserActivity::class.java)
             startActivityForResult(intent, REQUEST_CODE_ADD_USER)
         }
@@ -87,14 +73,11 @@ class SharedUserManageActivity : AppCompatActivity() {
 
     private fun updateMemberTitle() {
         val memberCount = sharedUsers.size
-        tvMemberTitle.text = "사용자 (${memberCount}명)"
+        binding.tvMemberTitle.text = "사용자 (${memberCount}명)"
     }
 
     private fun updateEmptyMessage() {
-        if (sharedUsers.isEmpty()) {
-            tvEmptyMessage.visibility = View.VISIBLE
-        } else {
-            tvEmptyMessage.visibility = View.GONE
-        }
+        binding.tvEmptyMessage.visibility =
+            if (sharedUsers.isEmpty()) View.VISIBLE else View.GONE
     }
 }
