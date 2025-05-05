@@ -52,4 +52,10 @@
     <string name="empty_illustration">택배함 없음 일러스트</string>
     <string name="home_empty_message">택배함을 추가하고 스마트한 관리를 시작하세요!</string>
     <string name="home_add_box_button">택배함 추가</string>
+
+    <!-- 이용 악관용 -->
+    <string name="terms_of_service">
+    여기에 이용약관 내용을 추가할 에정ㅏ.
+    </string>
+
 </resources>
