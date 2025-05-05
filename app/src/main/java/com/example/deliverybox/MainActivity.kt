@@ -1,41 +1,79 @@
 package com.example.deliverybox
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
-import com.google.android.material.bottomnavigation.BottomNavigationView
-import com.example.deliverybox.ui.home.HomeFragment
+import com.example.deliverybox.databinding.ActivityMainBinding
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var bottomNavigationView: BottomNavigationView
+    private lateinit var binding: ActivityMainBinding
+
+    // Firebase 인스턴스
+    private val auth by lazy { FirebaseAuth.getInstance() }
+    private val db   by lazy { FirebaseFirestore.getInstance() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        // BottomNavigationView를 findViewById로 연결
-        bottomNavigationView = findViewById(R.id.bottom_navigation)
+        // 1️⃣ 로그인 체크
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
 
-        // 첫 화면 기본 HomeFragment 띄우기
+        // 2️⃣ Firestore에서 사용자 문서 읽기 (실패해도 홈 화면 진입)
+        db.collection("users").document(uid).get()
+            .addOnSuccessListener {
+                // 따로 처리할 로직이 없으면 홈으로 이동
+                replaceFragment(HomeFragment())
+            }
+            .addOnFailureListener {
+                replaceFragment(HomeFragment())
+            }
+
+        // 3️⃣ 앱 시작 시 기본으로 HomeFragment 표시
         replaceFragment(HomeFragment())
 
-        // 탭 선택 리스너 설정
-        bottomNavigationView.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> replaceFragment(HomeFragment())
-                R.id.nav_package -> replaceFragment(PackageFragment())
-                R.id.nav_notification -> replaceFragment(NotificationFragment())
-                R.id.nav_doorlock -> replaceFragment(DoorlockFragment())
-                R.id.nav_setting -> replaceFragment(SettingFragment())
+        // 4️⃣ 바텀 네비게이션 클릭 리스너
+        binding.bottomNavigation.setOnItemSelectedListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.menu_home -> {
+                    replaceFragment(HomeFragment())
+                    true
+                }
+                R.id.menu_package -> {
+                    replaceFragment(PackageFragment())
+                    true
+                }
+                R.id.menu_notification -> {
+                    replaceFragment(NotificationFragment())
+                    true
+                }
+                R.id.menu_doorlock -> {
+                    replaceFragment(DoorlockFragment())
+                    true
+                }
+                R.id.menu_setting -> {
+                    replaceFragment(SettingFragment())
+                    true
+                }
+                else -> false
             }
-            true
         }
     }
 
+    // Fragment 교체 유틸 함수
     private fun replaceFragment(fragment: Fragment) {
         supportFragmentManager.beginTransaction()
-            .replace(R.id.container_fragment, fragment)
+            .replace(R.id.frameLayout, fragment)
             .commit()
     }
 }
