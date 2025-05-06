@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="12dp">
+
+    <ImageView
+        android:id="@+id/ivLogIcon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@drawable/ic_notification"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:contentDescription="로그 아이콘"/>
+
+    <TextView
+        android:id="@+id/tvLogEvent"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="이벤트 내용"
+        android:textSize="14sp"
+        android:textColor="#333333"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        app:layout_constraintStart_toEndOf="@id/ivLogIcon"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/tvLogTimestamp"/>
+
+    <TextView
+        android:id="@+id/tvLogTimestamp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="10분 전"
+        android:textSize="12sp"
+        android:textColor="#888888"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

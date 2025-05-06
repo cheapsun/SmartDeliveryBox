@@ -1,36 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView
+<com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="4dp">
+    android:layout_marginBottom="16dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="2dp"
+    app:strokeWidth="0dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:rippleColor="#33000000"
+    android:foreground="?attr/selectableItemBackground">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:padding="16dp">
 
-        <TextView
-            android:id="@+id/tvBoxAlias"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="택배함 별칭"
-            android:textSize="18sp"
-            android:textColor="#333333"
-            android:textStyle="bold" />
+        <!-- 왼쪽 아이콘 -->
+        <ImageView
+            android:id="@+id/ivBoxIcon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_package"
+            android:tint="#6A8DFF"
+            android:background="@drawable/circle_background"
+            android:padding="12dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:contentDescription="택배함 아이콘"/>
 
-        <TextView
-            android:id="@+id/tvBoxName"
-            android:layout_width="wrap_content"
+        <!-- 택배함 정보 -->
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="택배함 코드"
-            android:textSize="14sp"
-            android:textColor="#666666"
-            android:layout_marginTop="4dp" />
-    </LinearLayout>
+            android:orientation="vertical"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            app:layout_constraintStart_toEndOf="@id/ivBoxIcon"
+            app:layout_constraintEnd_toStartOf="@id/ivStatusIndicator"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent">
 
-</androidx.cardview.widget.CardView>
+            <TextView
+                android:id="@+id/tvBoxAlias"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="우리집 택배함"
+                android:textSize="18sp"
+                android:textColor="#1A1A1A"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+
+            <TextView
+                android:id="@+id/tvBoxInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="3개의 택배 | 마지막 업데이트: 3분 전"
+                android:textSize="14sp"
+                android:textColor="#666666"
+                android:layout_marginTop="4dp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+        </LinearLayout>
+
+        <!-- 상태 표시 -->
+        <ImageView
+            android:id="@+id/ivStatusIndicator"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_doorlock"
+            android:tint="#4CAF50"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:contentDescription="도어락 상태"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.google.android.material.card.MaterialCardView>
