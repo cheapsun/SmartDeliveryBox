@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "366122426597",
+    "project_id": "delivery-box-c7afd",
+    "storage_bucket": "delivery-box-c7afd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:366122426597:android:0766ac5a5d59fdb444740c",
+        "android_client_info": {
+          "package_name": "com.example.deliverybox"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUYxzQSUIk2YyHczGfE8KYcHpwXKAVov8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

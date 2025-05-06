@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/menu_home"
+        android:icon="@drawable/ic_home"
+        android:title="홈"/>
+
+    <item
+        android:id="@+id/menu_package"
+        android:icon="@drawable/ic_package"
+        android:title="택배"/>
+
+    <item
+        android:id="@+id/menu_notification"
+        android:icon="@drawable/ic_notification"
+        android:title="알림"/>
+
+    <item
+        android:id="@+id/menu_doorlock"
+        android:icon="@drawable/ic_doorlock"
+        android:title="도어락"/>
+
+    <item
+        android:id="@+id/menu_setting"
+        android:icon="@drawable/ic_setting"
+        android:title="설정"/>
+
+</menu>
