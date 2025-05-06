@@ -58,4 +58,15 @@
     여기에 이용약관 내용을 추가할 에정ㅏ.
     </string>
 
+    <!-- 이메일 인증 및 가입 관련 문자열 -->
+    <string name="email_verification_required">이메일 인증이 필요합니다. 이메일을 확인해주세요.</string>
+    <string name="email_verification_resend">인증 메일 다시 받기</string>
+    <string name="email_verification_success">인증이 완료되었습니다!</string>
+    <string name="email_verification_sent">인증 메일이 발송되었습니다</string>
+    <string name="password_set_required">비밀번호 설정이 필요합니다</string>
+    <string name="signup_completed">회원가입이 완료되었습니다!</string>
+    <string name="confirm_cancel_verification">인증을 취소하시겠습니까?</string>
+    <string name="confirm_cancel_password_setup">비밀번호 설정을 취소하시겠습니까?</string>
+    <string name="restart_from_beginning">처음부터 다시 시작해야 합니다</string>
+
 </resources>

@@ -9,10 +9,13 @@ import android.os.Bundle
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
+import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.deliverybox.databinding.ActivityLoginBinding
+import com.example.deliverybox.utils.AccountUtils
 import com.example.deliverybox.utils.FirestoreHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
@@ -24,6 +27,7 @@ class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var auth: FirebaseAuth
+    private val TAG = "LoginActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +38,9 @@ class LoginActivity : AppCompatActivity() {
         // Firebase 인증 객체 초기화
         auth = FirebaseAuth.getInstance()
 
+        // 기존 세션 확인 및 정리
+        checkExistingSession()
+
         // 로그인 버튼 상태 설정
         setupLoginButtonState()
 
@@ -42,6 +49,19 @@ class LoginActivity : AppCompatActivity() {
 
         // 버튼 클릭 리스너 설정
         setupClickListeners()
+    }
+
+    /**
+     * 기존 세션 확인 및 정리
+     * 세션은 있지만 미인증 상태인 계정 처리
+     */
+    private fun checkExistingSession() {
+        val currentUser = auth.currentUser
+        if (currentUser != null && !currentUser.isEmailVerified) {
+            // 미인증 계정 발견 - 삭제 처리
+            Log.d(TAG, "미인증 계정 발견, 정리 중...")
+            AccountUtils.deleteTempAccountAndSignOut()
+        }
     }
 
     /**
@@ -144,21 +164,49 @@ class LoginActivity : AppCompatActivity() {
         auth.signInWithEmailAndPassword(email, password)
             .addOnSuccessListener { result ->
                 val uid = result.user?.uid ?: return@addOnSuccessListener
+                val isEmailVerified = result.user?.isEmailVerified ?: false
+
+                Log.d(TAG, "로그인 성공. 이메일 인증 여부: $isEmailVerified")
+
+                // 이메일 인증 여부 확인
+                if (!isEmailVerified) {
+                    binding.progressLogin.visibility = View.GONE
+                    binding.btnLogin.isEnabled = true
+
+                    // 이메일 인증 안된 계정 - 인증 화면으로 이동 또는 재인증 메일 발송 제안
+                    showVerificationRequiredDialog(email)
+                    return@addOnSuccessListener
+                }
 
                 // FCM 토큰 업데이트 (푸시 알림용)
                 updateFcmToken(uid)
 
-                // Firestore에서 사용자 데이터 가져오기
+                // Firestore에서 사용자 데이터 가져오기 & 비밀번호 설정 여부 확인
                 FirestoreHelper.getUserData(uid) { userData ->
                     binding.progressLogin.visibility = View.GONE
 
                     if (userData != null) {
-                        Toast.makeText(this, "로그인 성공!", Toast.LENGTH_SHORT).show()
-                        startActivity(Intent(this, MainActivity::class.java))
-                        finish() // 현재 화면 종료
+                        if (userData.isPasswordSet) {
+                            // 정상 로그인 - 메인으로 이동
+                            Log.d(TAG, "로그인 및 비밀번호 설정 완료, 메인으로 이동")
+                            Toast.makeText(this, "로그인 성공!", Toast.LENGTH_SHORT).show()
+                            startActivity(Intent(this, MainActivity::class.java))
+                            finish()
+                        } else {
+                            // 비밀번호 설정이 필요한 경우 - 설정 화면으로 이동
+                            Log.d(TAG, "로그인 성공, 비밀번호 설정 필요")
+                            binding.btnLogin.isEnabled = true
+                            Toast.makeText(this, "비밀번호 설정이 필요합니다.", Toast.LENGTH_SHORT).show()
+
+                            val intent = Intent(this, SignupPasswordActivity::class.java)
+                            intent.putExtra("email", email)
+                            startActivity(intent)
+                        }
                     } else {
+                        // 사용자 데이터 로드 실패
                         binding.btnLogin.isEnabled = true
                         Toast.makeText(this, "사용자 정보 불러오기 실패", Toast.LENGTH_SHORT).show()
+                        Log.e(TAG, "사용자 데이터 로드 실패")
                     }
                 }
             }
@@ -174,7 +222,35 @@ class LoginActivity : AppCompatActivity() {
                     else -> "로그인 실패: ${e.message}"
                 }
                 Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show()
+                Log.e(TAG, "로그인 실패: $errorMessage")
             }
+    }
+
+    /**
+     * 이메일 인증 필요 대화상자 표시
+     */
+    private fun showVerificationRequiredDialog(email: String) {
+        AlertDialog.Builder(this)
+            .setTitle("이메일 인증 필요")
+            .setMessage("계정을 사용하기 위해서는 이메일 인증이 필요합니다. 인증 메일을 다시 받으시겠습니까?")
+            .setPositiveButton("인증 메일 다시 받기") { _, _ ->
+                // 인증 메일 재발송
+                auth.currentUser?.sendEmailVerification()
+                    ?.addOnSuccessListener {
+                        Toast.makeText(this, "인증 메일이 재발송되었습니다.", Toast.LENGTH_SHORT).show()
+
+                        // 인증 화면으로 이동
+                        val intent = Intent(this, EmailVerificationActivity::class.java)
+                        intent.putExtra("email", email)
+                        startActivity(intent)
+                    }
+                    ?.addOnFailureListener { e ->
+                        Toast.makeText(this, "인증 메일 발송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Log.e(TAG, "인증 메일 발송 실패: ${e.message}")
+                    }
+            }
+            .setNegativeButton("취소", null)
+            .show()
     }
 
     /**
@@ -238,9 +314,11 @@ class LoginActivity : AppCompatActivity() {
         auth.sendPasswordResetEmail(email)
             .addOnSuccessListener {
                 Toast.makeText(this, "비밀번호 재설정 이메일이 전송되었습니다", Toast.LENGTH_SHORT).show()
+                Log.d(TAG, "비밀번호 재설정 메일 발송 성공: $email")
             }
             .addOnFailureListener { e ->
                 Toast.makeText(this, "이메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                Log.e(TAG, "비밀번호 재설정 메일 발송 실패: ${e.message}")
             }
     }
 
@@ -252,5 +330,33 @@ class LoginActivity : AppCompatActivity() {
         val networkCapabilities = connectivityManager.activeNetwork ?: return false
         val actNw = connectivityManager.getNetworkCapabilities(networkCapabilities) ?: return false
         return actNw.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    /**
+     * 앱 재시작 시 인증 상태 확인 (onResume에서 호출)
+     */
+    override fun onResume() {
+        super.onResume()
+
+        // 현재 사용자 확인
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            // 사용자 상태 새로고침
+            currentUser.reload().addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    // 이메일 인증 및 비밀번호 설정 여부 확인
+                    if (currentUser.isEmailVerified) {
+                        FirestoreHelper.checkPasswordSet(currentUser.uid) { isPasswordSet ->
+                            if (isPasswordSet == true) {
+                                // 인증됨 + 비밀번호 설정 완료 - 메인으로 자동 이동
+                                Log.d(TAG, "자동 로그인: 인증 및 비밀번호 설정 완료")
+                                startActivity(Intent(this, MainActivity::class.java))
+                                finish()
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
