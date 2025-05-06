@@ -6,21 +6,14 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
-import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import com.example.deliverybox.databinding.ActivitySplashBinding
 import com.example.deliverybox.utils.AccountUtils
 import com.example.deliverybox.utils.NetworkUtils
 import com.example.deliverybox.utils.SharedPrefsHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import androidx.appcompat.app.AppCompatActivity
 
-/**
- * 스플래시 화면 및 앱 시작 로직 처리
- * - 네트워크 연결 확인
- * - 로그인 상태 및 계정 유효성 확인
- * - 회원가입 단계 확인 및 적절한 화면으로 이동
- */
 class SplashActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySplashBinding
@@ -36,7 +29,6 @@ class SplashActivity : AppCompatActivity() {
         binding = ActivitySplashBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Firebase 인증 객체 초기화
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
 
@@ -58,9 +50,6 @@ class SplashActivity : AppCompatActivity() {
         checkAndCleanupTempAccount()
     }
 
-    /**
-     * 네트워크 오류 표시
-     */
     private fun showNetworkError() {
         binding.progressSplash.visibility = View.GONE
         binding.tvNetworkError.visibility = View.VISIBLE
@@ -71,7 +60,6 @@ class SplashActivity : AppCompatActivity() {
             binding.tvNetworkError.visibility = View.GONE
             binding.btnRetry.visibility = View.GONE
 
-            // 네트워크 재확인
             Handler(Looper.getMainLooper()).postDelayed({
                 if (NetworkUtils.isNetworkAvailable(this)) {
                     checkAndCleanupTempAccount()
@@ -82,185 +70,88 @@ class SplashActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 미완료 임시 계정 확인 및 정리
-     * 인증되지 않은 계정은 삭제 처리
-     */
     private fun checkAndCleanupTempAccount() {
         val startTime = System.currentTimeMillis()
 
-        AccountUtils.deleteTempAccountAndSignOut {
-            // 계정 정리 후 정상 플로우 진행
+        AccountUtils.checkExceptionCases { result ->
             val elapsedTime = System.currentTimeMillis() - startTime
-
-            // 최소 표시 시간 보장
             if (elapsedTime < SPLASH_DELAY_MILLIS) {
                 Handler(Looper.getMainLooper()).postDelayed({
-                    startNormalFlow()
+                    handleAccountState(result)
                 }, SPLASH_DELAY_MILLIS - elapsedTime)
             } else {
-                startNormalFlow()
+                handleAccountState(result)
             }
         }
     }
 
-    /**
-     * 앱 정상 시작 플로우
-     */
-    private fun startNormalFlow() {
-        // 로그인 여부 체크
-        checkLoginStatus()
-    }
-
-    /**
-     * 현재 로그인 상태를 체크해서
-     *    - 로그인되어 있으면 MainActivity로 이동
-     *    - 로그인 안 되어 있으면 LoginActivity로 이동
-     */
-    private fun checkLoginStatus() {
-        val currentUser = auth.currentUser
-
-        if (currentUser != null) {
-            // 사용자 로그인 되어 있음
-            val uid = currentUser.uid
-
-            // 세션 유효성 확인
-            if (!isSessionValid()) {
-                // 세션 만료 - 자동 로그아웃
-                Log.d(TAG, "세션 만료, 자동 로그아웃")
-                auth.signOut()
-                SharedPrefsHelper.clearLoginSession(this)
-                navigateToLogin()
-                return
-            }
-
-            // 미인증 계정 처리 - 오래된 미인증 계정은 삭제
-            if (!currentUser.isEmailVerified) {
-                // 인증되지 않은 이메일
-                Log.d(TAG, "이메일 미인증 계정: ${currentUser.email}")
-
-                // 임시 계정 유효성 확인
-                AccountUtils.checkTempAccountValidity(uid) { isValid ->
-                    if (isValid) {
-                        // 유효 기간 내 미인증 계정 - 인증 화면으로
-                        navigateToEmailVerification(currentUser.email ?: "")
-                    } else {
-                        // 유효 기간 초과 - 계정 삭제 후 로그인 화면으로
-                        Log.d(TAG, "기간 만료된 미인증 계정, 삭제 처리")
-                        AccountUtils.deleteTempAccountAndSignOut {
-                            navigateToLogin()
-                        }
-                    }
-                }
-                return
-            }
-
-            // 비밀번호 설정 확인
-            db.collection("users").document(uid)
-                .get()
-                .addOnSuccessListener { doc ->
-                    val isPasswordSet = doc?.getBoolean("passwordSet") ?: false
-
-                    if (!isPasswordSet) {
-                        // 비밀번호 설정 필요
-                        Log.d(TAG, "비밀번호 설정 필요: ${currentUser.email}")
-                        navigateToPasswordSetting(currentUser.email ?: "")
-                        return@addOnSuccessListener
-                    }
-
-                    // 세션 갱신
-                    updateLoginSession()
-
-                    // 메인 화면으로 이동
-                    navigateToMain()
-                }
-                .addOnFailureListener { e ->
-                    // 사용자 데이터를 가져오지 못함 - 로그아웃 처리
-                    Log.e(TAG, "사용자 데이터 로드 실패, 로그아웃: $uid, 오류: ${e.message}")
-                    auth.signOut()
-                    SharedPrefsHelper.clearLoginSession(this)
-                    Toast.makeText(this, "사용자 정보를 불러올 수 없습니다. 다시 로그인해주세요.", Toast.LENGTH_SHORT).show()
+    // ← 수정된 부분: 로그 추가 및 처리 순서 동일
+    private fun handleAccountState(result: AccountUtils.ExceptionResult) {
+        when (result.state) {
+            AccountUtils.SignupState.NOT_LOGGED_IN -> {
+                // 로그인 필요 상태
+                if (result.email != null) {
+                    Log.d(TAG, "이메일 인증 필요 상태 감지: ${result.email}")
+                    val intent = Intent(this, EmailVerificationActivity::class.java)
+                    intent.putExtra("email", result.email)
+                    startActivity(intent)
+                } else {
                     navigateToLogin()
                 }
-        } else {
-            // 로그인 안 되어 있음
-            navigateToLogin()
+                finish()
+            }
+            AccountUtils.SignupState.EMAIL_VERIFIED -> {
+                // 이메일 인증은 되었으나 비밀번호 설정 필요
+                if (result.email != null) {
+                    Log.d(TAG, "비밀번호 설정 필요 상태 감지: ${result.email}")
+                    val intent = Intent(this, SignupPasswordActivity::class.java)
+                    intent.putExtra("email", result.email)
+                    intent.putExtra("fromVerification", true)
+                    startActivity(intent)
+                    finish()
+                } else {
+                    auth.signOut()
+                    navigateToLogin()
+                }
+            }
+            AccountUtils.SignupState.COMPLETED -> {
+                // 가입 완료 - 세션 확인 후 메인으로
+                checkLoginSession()
+            }
         }
     }
 
-    /**
-     * 세션 유효성 확인
-     */
+    private fun checkLoginSession() {
+        if (!isSessionValid()) {
+            Log.d(TAG, "세션 만료, 자동 로그아웃")
+            auth.signOut()
+            SharedPrefsHelper.clearLoginSession(this)
+            navigateToLogin()
+            return
+        }
+        updateLoginSession()
+        navigateToMain()
+    }
+
     private fun isSessionValid(): Boolean {
         val lastLoginTime = SharedPrefsHelper.getLastLoginTime(this)
         if (lastLoginTime <= 0) return false
-
         val now = System.currentTimeMillis()
         val elapsedHours = (now - lastLoginTime) / (1000 * 60 * 60)
-
         return elapsedHours < SESSION_TIMEOUT_HOURS
     }
 
-    /**
-     * 로그인 세션 갱신
-     */
     private fun updateLoginSession() {
-        val now = System.currentTimeMillis()
-        SharedPrefsHelper.setLastLoginTime(this, now)
+        SharedPrefsHelper.setLastLoginTime(this, System.currentTimeMillis())
     }
 
-    /**
-     * 로그인 화면으로 이동
-     */
     private fun navigateToLogin() {
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
+        startActivity(Intent(this, LoginActivity::class.java))
         finish()
     }
 
-    /**
-     * 이메일 인증 화면으로 이동
-     */
-    private fun navigateToEmailVerification(email: String) {
-        val intent = Intent(this, EmailVerificationActivity::class.java)
-        intent.putExtra("email", email)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
-    }
-
-    /**
-     * 비밀번호 설정 화면으로 이동
-     */
-    private fun navigateToPasswordSetting(email: String) {
-        val intent = Intent(this, SignupPasswordActivity::class.java)
-        intent.putExtra("email", email)
-        intent.putExtra("isVerified", true)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
-    }
-
-    /**
-     * 메인 화면으로 이동
-     */
     private fun navigateToMain() {
-        val intent = Intent(this, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
+        startActivity(Intent(this, MainActivity::class.java))
         finish()
-    }
-
-    /**
-     * 활동 재개 시 상태 확인
-     */
-    override fun onResume() {
-        super.onResume()
-
-        // 네트워크 상태 재확인
-        if (!NetworkUtils.isNetworkAvailable(this) && binding.tvNetworkError.visibility != View.VISIBLE) {
-            showNetworkError()
-        }
     }
 }

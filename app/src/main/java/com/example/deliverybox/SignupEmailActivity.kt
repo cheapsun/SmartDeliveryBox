@@ -5,10 +5,8 @@ import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.util.Log
 import android.util.Patterns
 import android.view.View
-import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ProgressBar
@@ -16,27 +14,20 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
+import com.example.deliverybox.databinding.ActivitySignupEmailBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import java.util.UUID
+import com.example.deliverybox.utils.AccountUtils
 
-/**
- * 1단계: 이메일 입력 및 임시 계정 생성
- */
+
 class SignupEmailActivity : AppCompatActivity() {
 
-    companion object {
-        private const val TAG = "SignupEmailActivity"
-    }
-
-    private lateinit var toolbar: Toolbar
+    private lateinit var binding: ActivitySignupEmailBinding
     private lateinit var etEmail: EditText
     private lateinit var checkBoxTerms: CheckBox
-    private lateinit var btnNext: Button
+    private lateinit var btnNext: TextView
     private lateinit var progressEmailCheck: ProgressBar
-    private lateinit var tvTermsLink: TextView
 
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
@@ -45,33 +36,29 @@ class SignupEmailActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_signup_email)
+        binding = ActivitySignupEmailBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        // 뷰 초기화
+        etEmail = binding.etEmail
+        checkBoxTerms = binding.checkboxTerms
+        btnNext = binding.btnNextStep
+        progressEmailCheck = binding.progressEmailCheck
 
         // Firebase 초기화
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
 
-        // UI 요소 연결
-        toolbar = findViewById(R.id.toolbar_signup)
-        etEmail = findViewById(R.id.et_email)
-        checkBoxTerms = findViewById(R.id.checkbox_terms)
-        btnNext = findViewById(R.id.btn_next_step)
-        progressEmailCheck = findViewById(R.id.progress_email_check)
-        tvTermsLink = findViewById(R.id.tv_terms_link)
-
-        // 툴바 설정
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayShowTitleEnabled(false)
-        toolbar.setNavigationOnClickListener {
-            onBackPressedDispatcher.onBackPressed()
+        // 툴바 뒤로가기 설정
+        binding.toolbarSignup.setNavigationOnClickListener {
+            onBackPressed()
         }
 
-        // 이메일 & 약관 체크 시 다음 버튼 활성화 + 색상 변경
+        // 이메일 & 약관 체크 시 다음 버튼 활성화 상태 변경
         val watcher = object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
                 validateEmailAndUpdateUI()
             }
-
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         }
@@ -81,7 +68,12 @@ class SignupEmailActivity : AppCompatActivity() {
             validateEmailAndUpdateUI()
         }
 
-        // 다음 버튼 클릭 -> 임시 계정 생성
+        // 약관 보기 링크 클릭
+        binding.tvTermsLink.setOnClickListener {
+            showTermsDialog()
+        }
+
+        // 다음 버튼 클릭 -> 이메일 중복 확인 및 계정 생성
         btnNext.setOnClickListener {
             if (isCheckingEmail) return@setOnClickListener
 
@@ -93,18 +85,14 @@ class SignupEmailActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // 이메일 중복 확인 및 임시 계정 생성
-            checkEmailAndCreateTempAccount(email)
-        }
-
-        // 약관 보기 링크 클릭
-        tvTermsLink.setOnClickListener {
-            showTermsDialog()
+            // 이메일 중복 확인
+            checkEmailExists(email)
         }
     }
 
     /**
      * 이메일 유효성 검사 및 UI 업데이트
+     * 이메일 형식이 유효하고 약관에 동의한 경우에만 다음 버튼 활성화
      */
     private fun validateEmailAndUpdateUI() {
         val email = etEmail.text.toString().trim()
@@ -129,9 +117,10 @@ class SignupEmailActivity : AppCompatActivity() {
     }
 
     /**
-     * 이메일 중복 확인 및 임시 계정 생성
+     * 이메일 중복 확인
+     * 사용 가능한 이메일인 경우 임시 계정 생성 진행
      */
-    private fun checkEmailAndCreateTempAccount(email: String) {
+    private fun checkEmailExists(email: String) {
         isCheckingEmail = true
         progressEmailCheck.visibility = View.VISIBLE
         btnNext.isEnabled = false
@@ -139,24 +128,23 @@ class SignupEmailActivity : AppCompatActivity() {
         // Firebase에서 이메일 중복 확인
         auth.fetchSignInMethodsForEmail(email)
             .addOnCompleteListener { task ->
+                isCheckingEmail = false
+                progressEmailCheck.visibility = View.GONE
+
                 if (task.isSuccessful) {
                     val signInMethods = task.result?.signInMethods
                     if (signInMethods != null && signInMethods.isNotEmpty()) {
                         // 이미 등록된 이메일
                         etEmail.error = "이미 등록된 이메일입니다"
-                        isCheckingEmail = false
-                        progressEmailCheck.visibility = View.GONE
                         btnNext.isEnabled = false
                     } else {
                         // 사용 가능한 이메일 - 임시 계정 생성
-                        createTempAccount(email)
+                        createTemporaryAccount(email)
                     }
                 } else {
                     // 확인 실패
                     Toast.makeText(this, "이메일 확인 중 오류가 발생했습니다: ${task.exception?.message}",
                         Toast.LENGTH_SHORT).show()
-                    isCheckingEmail = false
-                    progressEmailCheck.visibility = View.GONE
                     validateEmailAndUpdateUI()
                 }
             }
@@ -164,94 +152,84 @@ class SignupEmailActivity : AppCompatActivity() {
 
     /**
      * 임시 비밀번호로 계정 생성
+     * 임시 비밀번호는 16자리 랜덤 문자열로 생성
+     * 계정 생성 후 이메일 인증 메일 발송
      */
-    private fun createTempAccount(email: String) {
-        // 임시 비밀번호 생성 (보안을 위해 강력한 랜덤 비밀번호 사용)
+    private fun createTemporaryAccount(email: String) {
+        // 임시 비밀번호 생성
         val tempPassword = generateTempPassword()
+
+        // 로딩 표시
+        progressEmailCheck.visibility = View.VISIBLE
 
         // Firebase 계정 생성
         auth.createUserWithEmailAndPassword(email, tempPassword)
             .addOnSuccessListener { result ->
                 val user = result.user
                 if (user != null) {
-                    // 이메일 인증 메일 전송
-                    user.sendEmailVerification()
-                        .addOnSuccessListener {
-                            // Firestore에 사용자 정보 저장
-                            val userData = hashMapOf(
-                                "email" to email,
-                                "createdAt" to FieldValue.serverTimestamp(),
-                                "emailVerified" to false,
-                                "passwordSet" to false,
-                                "tempPasswordHash" to tempPassword.hashCode(), // 해시값만 저장 (보안)
-                                "nickname" to null,
-                                "isAdmin" to false
-                            )
+                    // Firestore에 사용자 정보 저장
+                    val userData = hashMapOf(
+                        "email" to email,
+                        "createdAt" to FieldValue.serverTimestamp(),
+                        "nickname" to null,
+                        "isAdmin" to false,
+                        "emailVerified" to false,
+                        "passwordSet" to false, // 비밀번호 설정 여부
+                        "tempPasswordHash" to tempPassword.hashCode() // 임시 비밀번호 해시값 저장 (보안용)
+                    )
 
-                            db.collection("users").document(user.uid)
-                                .set(userData)
+                    db.collection("users").document(user.uid)
+                        .set(userData)
+                        .addOnSuccessListener {
+                            // 이메일 인증 메일 전송
+                            user.sendEmailVerification()
                                 .addOnSuccessListener {
+                                    progressEmailCheck.visibility = View.GONE
+
+                                    // 상태 저장
+                                    AccountUtils.saveSignupState(
+                                        AccountUtils.SignupState.NOT_LOGGED_IN,
+                                        email,
+                                        tempPassword
+                                    )
+
                                     // 인증 화면으로 이동
-                                    Toast.makeText(this, "인증 메일이 발송되었습니다. 메일함을 확인해주세요.", Toast.LENGTH_SHORT).show()
                                     val intent = Intent(this, EmailVerificationActivity::class.java)
                                     intent.putExtra("email", email)
-                                    intent.putExtra("tempPasswordHash", tempPassword.hashCode().toString())
+                                    intent.putExtra("tempPassword", tempPassword) // 임시 비밀번호 전달
                                     startActivity(intent)
-
-                                    // 로딩 상태 해제
-                                    isCheckingEmail = false
-                                    progressEmailCheck.visibility = View.GONE
                                 }
                                 .addOnFailureListener { e ->
-                                    // 사용자 정보 저장 실패 처리
-                                    Log.e(TAG, "사용자 정보 저장 실패: ${e.message}")
-                                    Toast.makeText(this, "사용자 정보 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    isCheckingEmail = false
                                     progressEmailCheck.visibility = View.GONE
+                                    Toast.makeText(this, "인증 메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    // 실패 시 계정 삭제
+                                    user.delete()
                                     btnNext.isEnabled = true
                                 }
                         }
                         .addOnFailureListener { e ->
-                            // 인증 메일 발송 실패 처리
-                            Log.e(TAG, "인증 메일 전송 실패: ${e.message}")
-                            Toast.makeText(this, "인증 메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-                            isCheckingEmail = false
                             progressEmailCheck.visibility = View.GONE
+                            Toast.makeText(this, "사용자 정보 저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                            // 실패 시 계정 삭제
+                            user.delete()
                             btnNext.isEnabled = true
-
-                            // 실패 시 생성된 계정 삭제 (정리)
-                            user.delete().addOnCompleteListener {
-                                if (it.isSuccessful) {
-                                    Log.d(TAG, "임시 계정 생성 실패로 인한 계정 삭제 완료")
-                                }
-                            }
                         }
-                } else {
-                    // 계정 생성 실패
-                    Toast.makeText(this, "계정 생성 실패", Toast.LENGTH_SHORT).show()
-                    isCheckingEmail = false
-                    progressEmailCheck.visibility = View.GONE
-                    btnNext.isEnabled = true
                 }
             }
             .addOnFailureListener { e ->
-                // 계정 생성 실패 처리
-                Log.e(TAG, "계정 생성 실패: ${e.message}")
-                Toast.makeText(this, "계정 생성 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-                isCheckingEmail = false
                 progressEmailCheck.visibility = View.GONE
+                Toast.makeText(this, "계정 생성 실패: ${e.message}", Toast.LENGTH_SHORT).show()
                 btnNext.isEnabled = true
             }
     }
 
     /**
      * 임시 비밀번호 생성
+     * 16자리 랜덤 문자열 (영문 대소문자, 숫자, 특수문자)
      */
     private fun generateTempPassword(): String {
-        // 임시 비밀번호는 16자 이상의 강력한 랜덤 문자열로 생성
-        // Firebase 비밀번호 정책 준수 (최소 6자, 대소문자+숫자 포함)
-        val uuid = UUID.randomUUID().toString().replace("-", "")
-        return "Temp$uuid" // 앞에 Temp를 붙여 대문자 포함하도록 함
+        val allowedChars = ('A'..'Z') + ('a'..'z') + ('0'..'9') + "!@#$%^&*()_-+=<>?"
+        return (1..16).map { allowedChars.random() }.joinToString("")
     }
 
     /**
@@ -265,6 +243,22 @@ class SignupEmailActivity : AppCompatActivity() {
                 dialog.dismiss()
             }
             .create()
+            .show()
+    }
+
+    /**
+     * 뒤로가기 처리
+     */
+    override fun onBackPressed() {
+        // 커스텀 뒤로가기 처리
+        AlertDialog.Builder(this)
+            .setTitle("회원가입 취소")
+            .setMessage("회원가입을 취소하시겠습니까?")
+            .setPositiveButton("예") { _, _ ->
+                // 회원가입 과정 취소, 로그인 화면으로 이동
+                super.onBackPressed()
+            }
+            .setNegativeButton("아니오", null)
             .show()
     }
 }
