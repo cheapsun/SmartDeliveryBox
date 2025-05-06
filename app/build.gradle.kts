@@ -54,8 +54,11 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.lifecycle:lifecycle-process:2.6.2")
+    // 🔐 보안 관련 라이브러리
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.security:security-crypto-ktx:1.1.0-alpha06")
+    // ✅ WorkManager (코루틴 지원)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 
 
     implementation("com.google.android.material:material:1.11.0")

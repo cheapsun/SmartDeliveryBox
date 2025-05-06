@@ -3,8 +3,6 @@ package com.example.deliverybox
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.text.Spannable
 import android.text.SpannableString
@@ -15,16 +13,22 @@ import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.example.deliverybox.databinding.ActivityLoginBinding
 import com.example.deliverybox.utils.FirestoreHelper
+import com.example.deliverybox.utils.NetworkUtils
+import com.example.deliverybox.utils.SharedPrefsHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var auth: FirebaseAuth
+    private lateinit var db: FirebaseFirestore
+
+    private val TAG = "LoginActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +38,7 @@ class LoginActivity : AppCompatActivity() {
 
         // Firebase 인증 객체 초기화
         auth = FirebaseAuth.getInstance()
+        db = FirebaseFirestore.getInstance()
 
         // 로그인 버튼 상태 설정
         setupLoginButtonState()
@@ -79,7 +84,11 @@ class LoginActivity : AppCompatActivity() {
         binding.btnLogin.setOnClickListener {
             val email = binding.etEmail.text.toString().trim()
             val password = binding.etPassword.text.toString().trim()
-            login(email, password)
+
+            // 네트워크 연결 확인 후 로그인 진행
+            checkNetworkAndProceed {
+                login(email, password)
+            }
         }
 
         // 회원가입 텍스트 클릭
@@ -126,69 +135,113 @@ class LoginActivity : AppCompatActivity() {
 
     /**
      * 로그인 처리
+     * 로그인 성공 후 사용자 상태에 따라 다른 화면으로 이동
      */
     private fun login(email: String, password: String) {
         // 입력값 검증
         if (!validateInputs()) return
 
-        // 네트워크 연결 확인
-        if (!isNetworkAvailable()) {
-            Toast.makeText(this, "인터넷 연결을 확인해주세요", Toast.LENGTH_SHORT).show()
-            return
-        }
-
         // 로딩 표시 시작
         binding.progressLogin.visibility = View.VISIBLE
         binding.btnLogin.isEnabled = false
 
-        // Firebase로 로그인 시도
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnSuccessListener { result ->
-                val user = result.user
+        try {
+            // Firebase로 로그인 시도
+            auth.signInWithEmailAndPassword(email, password)
+                .addOnSuccessListener { result ->
+                    val user = result.user
 
-                // 이메일 인증 확인
-                if (user != null && !user.isEmailVerified) {
-                    // 인증되지 않은 이메일
+                    // 이메일 인증 확인
+                    if (user != null && !user.isEmailVerified) {
+                        // 인증되지 않은 이메일
+                        binding.progressLogin.visibility = View.GONE
+                        binding.btnLogin.isEnabled = true
+
+                        // 이메일 인증 화면으로 이동할지 묻기
+                        showEmailVerificationPrompt(email)
+                        return@addOnSuccessListener
+                    }
+
+                    val uid = user?.uid ?: return@addOnSuccessListener
+
+                    // Firestore에서 사용자 상태 확인
+                    db.collection("users").document(uid)
+                        .get()
+                        .addOnSuccessListener { doc ->
+                            binding.progressLogin.visibility = View.GONE
+
+                            val emailVerified = doc?.getBoolean("emailVerified") ?: false
+                            val passwordSet = doc?.getBoolean("passwordSet") ?: false
+
+                            when {
+                                // 가입 완료 - 메인으로 이동
+                                emailVerified && passwordSet -> {
+                                    // FCM 토큰 업데이트
+                                    updateFcmToken(uid)
+
+                                    // 세션 정보 저장
+                                    SharedPrefsHelper.saveUserSession(
+                                        this,
+                                        uid,
+                                        auth.currentUser?.getIdToken(false)?.result?.token ?: ""
+                                    )
+
+                                    Toast.makeText(this, "로그인 성공!", Toast.LENGTH_SHORT).show()
+                                    startActivity(Intent(this, MainActivity::class.java))
+                                    finish()
+                                }
+                                // 이메일만 인증 - 비밀번호 설정으로 이동
+                                emailVerified -> {
+                                    Toast.makeText(this, "비밀번호 설정이 필요합니다", Toast.LENGTH_SHORT).show()
+                                    val intent = Intent(this, SignupPasswordActivity::class.java)
+                                    intent.putExtra("email", email)
+                                    intent.putExtra("fromVerification", true)
+                                    startActivity(intent)
+                                }
+                                // 상태 불일치 - 데이터베이스 업데이트
+                                else -> {
+                                    // Firebase Auth에는 인증됐지만 Firestore에는 아직 반영 안된 경우
+                                    db.collection("users").document(uid)
+                                        .update("emailVerified", true)
+                                        .addOnSuccessListener {
+                                            // 비밀번호 설정 화면으로 이동
+                                            val intent = Intent(this, SignupPasswordActivity::class.java)
+                                            intent.putExtra("email", email)
+                                            intent.putExtra("fromVerification", true)
+                                            startActivity(intent)
+                                        }
+                                        .addOnFailureListener {
+                                            binding.btnLogin.isEnabled = true
+                                            Toast.makeText(this, "상태 업데이트 실패", Toast.LENGTH_SHORT).show()
+                                        }
+                                }
+                            }
+                        }
+                        .addOnFailureListener {
+                            binding.progressLogin.visibility = View.GONE
+                            binding.btnLogin.isEnabled = true
+                            Toast.makeText(this, "사용자 정보 로드 실패", Toast.LENGTH_SHORT).show()
+                        }
+                }
+                .addOnFailureListener { e ->
                     binding.progressLogin.visibility = View.GONE
                     binding.btnLogin.isEnabled = true
 
-                    // 이메일 인증 화면으로 이동할지 묻기
-                    showEmailVerificationPrompt(email)
-                    return@addOnSuccessListener
-                }
-
-                val uid = user?.uid ?: return@addOnSuccessListener
-
-                // FCM 토큰 업데이트 (푸시 알림용)
-                updateFcmToken(uid)
-
-                // Firestore에서 사용자 데이터 가져오기
-                FirestoreHelper.getUserData(uid) { userData ->
-                    binding.progressLogin.visibility = View.GONE
-
-                    if (userData != null) {
-                        Toast.makeText(this, "로그인 성공!", Toast.LENGTH_SHORT).show()
-                        startActivity(Intent(this, MainActivity::class.java))
-                        finish() // 현재 화면 종료
-                    } else {
-                        binding.btnLogin.isEnabled = true
-                        Toast.makeText(this, "사용자 정보 불러오기 실패", Toast.LENGTH_SHORT).show()
+                    // 오류 유형에 따른 맞춤 메시지 표시
+                    val errorMessage = when (e) {
+                        is FirebaseAuthInvalidUserException -> "존재하지 않는 계정입니다"
+                        is FirebaseAuthInvalidCredentialsException -> "이메일 또는 비밀번호가 일치하지 않습니다"
+                        is FirebaseNetworkException -> "네트워크 오류가 발생했습니다"
+                        else -> "로그인 실패: ${e.message}"
                     }
+                    Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show()
                 }
-            }
-            .addOnFailureListener { e ->
-                binding.progressLogin.visibility = View.GONE
-                binding.btnLogin.isEnabled = true
-
-                // 오류 유형에 따른 맞춤 메시지 표시
-                val errorMessage = when (e) {
-                    is FirebaseAuthInvalidUserException -> "존재하지 않는 계정입니다"
-                    is FirebaseAuthInvalidCredentialsException -> "이메일 또는 비밀번호가 일치하지 않습니다"
-                    is FirebaseNetworkException -> "네트워크 오류가 발생했습니다"
-                    else -> "로그인 실패: ${e.message}"
-                }
-                Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show()
-            }
+        } catch (e: Exception) {
+            binding.progressLogin.visibility = View.GONE
+            binding.btnLogin.isEnabled = true
+            Log.e(TAG, "로그인 처리 중 예외 발생: ${e.message}")
+            Toast.makeText(this, "로그인 처리 중 오류가 발생했습니다", Toast.LENGTH_SHORT).show()
+        }
     }
 
     /**
@@ -213,14 +266,18 @@ class LoginActivity : AppCompatActivity() {
      * FCM 토큰 업데이트 - 푸시 알림용
      */
     private fun updateFcmToken(uid: String) {
-        FirebaseMessaging.getInstance().token
-            .addOnSuccessListener { token ->
-                FirestoreHelper.updateFcmToken(uid, token)
-            }
-            .addOnFailureListener { e ->
-                // 토큰 가져오기 실패 처리 - 로그만 남기고 진행 (심각한 오류 아님)
-                Log.e("LoginActivity", "FCM 토큰 가져오기 실패: ${e.message}")
-            }
+        try {
+            FirebaseMessaging.getInstance().token
+                .addOnSuccessListener { token ->
+                    FirestoreHelper.updateFcmToken(uid, token)
+                }
+                .addOnFailureListener { e ->
+                    // 토큰 가져오기 실패 처리 - 로그만 남기고 진행 (심각한 오류 아님)
+                    Log.e(TAG, "FCM 토큰 가져오기 실패: ${e.message}")
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "FCM 토큰 처리 중 예외 발생: ${e.message}")
+        }
     }
 
     /**
@@ -255,7 +312,9 @@ class LoginActivity : AppCompatActivity() {
             .setPositiveButton("전송") { dialog, _ ->
                 val email = etDialogEmail.text.toString().trim()
                 if (email.isNotEmpty()) {
-                    sendPasswordResetEmail(email)
+                    checkNetworkAndProceed {
+                        sendPasswordResetEmail(email)
+                    }
                 } else {
                     Toast.makeText(this, "이메일을 입력해주세요", Toast.LENGTH_SHORT).show()
                 }
@@ -272,22 +331,28 @@ class LoginActivity : AppCompatActivity() {
      * 비밀번호 재설정 이메일 전송
      */
     private fun sendPasswordResetEmail(email: String) {
-        auth.sendPasswordResetEmail(email)
-            .addOnSuccessListener {
-                Toast.makeText(this, "비밀번호 재설정 이메일이 전송되었습니다", Toast.LENGTH_SHORT).show()
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "이메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+        try {
+            auth.sendPasswordResetEmail(email)
+                .addOnSuccessListener {
+                    Toast.makeText(this, "비밀번호 재설정 이메일이 전송되었습니다", Toast.LENGTH_SHORT).show()
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(this, "이메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "비밀번호 재설정 메일 전송 중 예외 발생: ${e.message}")
+            Toast.makeText(this, "재설정 메일 발송 중 오류가 발생했습니다", Toast.LENGTH_SHORT).show()
+        }
     }
 
     /**
-     * 네트워크 연결 상태 확인
+     * 네트워크 연결 확인 후 작업 수행
      */
-    private fun isNetworkAvailable(): Boolean {
-        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val networkCapabilities = connectivityManager.activeNetwork ?: return false
-        val actNw = connectivityManager.getNetworkCapabilities(networkCapabilities) ?: return false
-        return actNw.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    private fun checkNetworkAndProceed(action: () -> Unit) {
+        if (NetworkUtils.isNetworkAvailable(this)) {
+            action()
+        } else {
+            Toast.makeText(this, "인터넷 연결을 확인해주세요", Toast.LENGTH_SHORT).show()
+        }
     }
 }
