@@ -1,233 +1,219 @@
 package com.example.deliverybox
 
-import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.graphics.Color
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.util.Log
 import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.example.deliverybox.databinding.ActivitySignupPasswordBinding
-import com.example.deliverybox.utils.AccountUtils
+import androidx.core.content.ContextCompat
+import com.example.deliverybox.utils.FirestoreHelper
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 
 class SignupPasswordActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivitySignupPasswordBinding
+    private lateinit var etPassword: EditText
+    private lateinit var etConfirmPassword: EditText
+    private lateinit var tvStrength: TextView
+    private lateinit var tvInfo: TextView
+    private lateinit var btnConfirm: Button
+
     private lateinit var auth: FirebaseAuth
     private lateinit var email: String
-    private val TAG = "SignupPasswordActivity"
+
+    // 비밀번호 강도 레벨
+    enum class PasswordStrength(val text: String, val color: Int) {
+        WEAK("약함", Color.RED),
+        MEDIUM("중간", Color.rgb(255, 165, 0)), // 주황색
+        STRONG("강함", Color.GREEN)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivitySignupPasswordBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        setContentView(R.layout.activity_signup_password)
 
-        // Firebase 인증 초기화
         auth = FirebaseAuth.getInstance()
 
-        // 이전 화면에서 전달된 데이터 확인
-        email = intent.getStringExtra("email") ?: auth.currentUser?.email ?: ""
-
-        // 계정 정보 확인
-        if (email.isEmpty() || auth.currentUser == null) {
-            Log.e(TAG, "인증 정보 없음, 로그인 화면으로 이동")
-            Toast.makeText(this, "인증 정보가 없습니다. 처음부터 다시 시도해주세요.", Toast.LENGTH_SHORT).show()
-            startActivity(Intent(this, LoginActivity::class.java))
+        // 이전 화면에서 전달받은 이메일
+        email = intent.getStringExtra("email") ?: ""
+        if (email.isEmpty()) {
+            Toast.makeText(this, "이메일 정보가 없습니다", Toast.LENGTH_SHORT).show()
             finish()
             return
         }
 
-        // 사용자가 이메일 인증을 완료했는지 확인
-        auth.currentUser?.reload()?.addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                if (!auth.currentUser?.isEmailVerified!!) {
-                    Log.e(TAG, "이메일 미인증, 인증 화면으로 이동")
-                    Toast.makeText(this, "이메일 인증이 완료되지 않았습니다.", Toast.LENGTH_SHORT).show()
-                    // 인증 화면으로 이동
-                    val intent = Intent(this, EmailVerificationActivity::class.java)
-                    intent.putExtra("email", email)
-                    startActivity(intent)
-                    finish()
-                    return@addOnCompleteListener
-                }
+        // UI 요소 연결
+        etPassword = findViewById(R.id.et_password)
+        etConfirmPassword = findViewById(R.id.et_confirm_password)
+        tvStrength = findViewById(R.id.tv_strength)
+        tvInfo = findViewById(R.id.tv_info)
+        btnConfirm = findViewById(R.id.btn_confirm)
+
+        // 비밀번호 안내 문구 업데이트
+        tvInfo.text = "비밀번호는 8~16자. 숫자, 문자, 특수문자를 모두 포함해야 합니다."
+
+        // TextWatcher 설정
+        val watcher = object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                validatePasswordAndUpdateUI()
             }
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         }
 
-        // 뒤로가기 버튼 설정
-        binding.toolbarPassword.setNavigationOnClickListener {
-            showCancelConfirmationDialog()
-        }
+        etPassword.addTextChangedListener(watcher)
+        etConfirmPassword.addTextChangedListener(watcher)
 
-        // 비밀번호 요구사항 체크리스트 초기화
-        initPasswordRequirements()
+        // 회원가입 완료 버튼
+        btnConfirm.setOnClickListener {
+            val password = etPassword.text.toString()
+            val confirmPassword = etConfirmPassword.text.toString()
 
-        // 비밀번호 입력 감지 설정
-        setupPasswordWatcher()
-
-        // 회원가입 버튼 클릭 리스너
-        binding.btnConfirm.setOnClickListener {
-            val password = binding.etPassword.text.toString()
-            val confirmPassword = binding.etConfirmPassword.text.toString()
-
-            // 유효성 검사
-            if (!validatePassword(password, confirmPassword)) return@setOnClickListener
-
-            // 네트워크 연결 확인
-            if (!isNetworkAvailable()) {
-                Toast.makeText(this, "인터넷 연결을 확인해주세요", Toast.LENGTH_SHORT).show()
+            // 최종 유효성 검사
+            if (!validatePassword(password)) {
+                Toast.makeText(this, "안전한 비밀번호를 입력해 주세요", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            // 비밀번호 업데이트
-            updatePassword(password)
-        }
-
-        // 앱 재시작 후 진입 시 비밀번호 설정 여부 확인
-        checkPasswordSetState()
-    }
-
-    /**
-     * 비밀번호 설정 여부 확인
-     * 앱이 재시작된 경우 이미 비밀번호가 설정되어 있을 수 있음
-     */
-    private fun checkPasswordSetState() {
-        val uid = auth.currentUser?.uid ?: return
-
-        AccountUtils.checkPasswordSet(uid) { isPasswordSet ->
-            if (isPasswordSet == true) {
-                Log.d(TAG, "이미 비밀번호 설정 완료, 메인 화면으로 이동")
-                // 이미 비밀번호가 설정되어 있으면 메인으로 이동
-                startActivity(Intent(this, MainActivity::class.java))
-                finish()
+            if (password != confirmPassword) {
+                etConfirmPassword.error = "비밀번호가 일치하지 않습니다"
+                return@setOnClickListener
             }
+
+            // Firebase에 계정 생성
+            createAccount(email, password)
         }
     }
 
     /**
-     * 취소 확인 다이얼로그 표시
+     * 비밀번호 유효성 검사 및 UI 업데이트
      */
-    private fun showCancelConfirmationDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("비밀번호 설정 취소")
-            .setMessage("비밀번호 설정을 취소하시겠습니까? 처음부터 다시 시작해야 합니다.")
-            .setPositiveButton("확인") { _, _ ->
-                // 임시 계정 삭제 후 이전 화면으로 이동
-                AccountUtils.deleteTempAccountAndSignOut {
-                    finish()
-                }
-            }
-            .setNegativeButton("계속 진행", null)
-            .show()
-    }
+    private fun validatePasswordAndUpdateUI() {
+        val password = etPassword.text.toString()
+        val confirmPassword = etConfirmPassword.text.toString()
 
-    /**
-     * 비밀번호 요구사항 체크리스트 초기화
-     */
-    private fun initPasswordRequirements() {
-        // 모든 요구사항 항목을 비활성 상태로 초기화
-        binding.tvReqLength.setTextColor(Color.parseColor("#AAAAAA"))
-        binding.tvReqUppercase.setTextColor(Color.parseColor("#AAAAAA"))
-        binding.tvReqLowercase.setTextColor(Color.parseColor("#AAAAAA"))
-        binding.tvReqDigit.setTextColor(Color.parseColor("#AAAAAA"))
-        binding.tvReqSpecial.setTextColor(Color.parseColor("#AAAAAA"))
-    }
+        // 비밀번호 강도 평가
+        val passwordStrength = getPasswordStrength(password)
 
-    // ... 기존 코드 (setupPasswordWatcher, updatePasswordRequirements, getPasswordStrength 등) ...
+        // 강도 표시 업데이트
+        tvStrength.text = "비밀번호 보안 수준: ${passwordStrength.text}"
+        tvStrength.setTextColor(passwordStrength.color)
 
-    /**
-     * 비밀번호 업데이트
-     */
-    private fun updatePassword(password: String) {
-        // 로딩 표시
-        binding.progressSignup.visibility = View.VISIBLE
-        binding.btnConfirm.isEnabled = false
+        // 비밀번호 확인 일치 여부
+        val isMatching = password.isNotEmpty() && password == confirmPassword
 
-        // 비밀번호 업데이트
-        auth.currentUser?.updatePassword(password)
-            ?.addOnSuccessListener {
-                // 비밀번호 설정 완료 플래그 저장
-                val uid = auth.currentUser?.uid ?: return@addOnSuccessListener
-                AccountUtils.setPasswordFlag(uid, true) { success ->
-                    binding.progressSignup.visibility = View.GONE
+        // 강도가 적어도 중간 이상이고, 비밀번호가 일치할 때만 버튼 활성화
+        val isStrengthSufficient = passwordStrength != PasswordStrength.WEAK
+        val isEnabled = isStrengthSufficient && isMatching
 
-                    if (success) {
-                        Toast.makeText(this, "회원가입이 완료되었습니다!", Toast.LENGTH_LONG).show()
-
-                        // 메인 화면으로 이동
-                        val intent = Intent(this, MainActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
-                    } else {
-                        binding.btnConfirm.isEnabled = true
-                        Toast.makeText(this, "회원가입은 완료되었으나 상태 저장에 실패했습니다. 다시 시도해주세요.", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-            ?.addOnFailureListener { e ->
-                binding.progressSignup.visibility = View.GONE
-                binding.btnConfirm.isEnabled = true
-
-                // 오류 종류에 따른 메시지 처리
-                val errorMessage = when (e) {
-                    is FirebaseAuthWeakPasswordException -> "비밀번호가 너무 약합니다"
-                    else -> "비밀번호 설정 실패: ${e.message}"
-                }
-
-                Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show()
-            }
-    }
-
-    /**
-     * 비밀번호 설정 이후 앱이 종료된 경우 처리 (onResume에서 확인)
-     */
-    override fun onResume() {
-        super.onResume()
-
-        if (auth.currentUser == null) {
-            // 로그인 화면으로 이동
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-            return
+        btnConfirm.isEnabled = isEnabled
+        if (isEnabled) {
+            btnConfirm.setBackgroundColor(Color.parseColor("#448AFF"))
+        } else {
+            btnConfirm.setBackgroundColor(Color.parseColor("#AABEFF"))
         }
 
-        // 사용자 정보 새로고침 및 인증 상태 확인
-        auth.currentUser?.reload()?.addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                if (!auth.currentUser?.isEmailVerified!!) {
-                    // 이메일 미인증 시 인증 화면으로 이동
-                    val intent = Intent(this, EmailVerificationActivity::class.java)
-                    intent.putExtra("email", email)
-                    startActivity(intent)
-                    finish()
-                }
-            }
+        // 비밀번호 불일치 오류 표시
+        if (confirmPassword.isNotEmpty() && !isMatching) {
+            etConfirmPassword.error = "비밀번호가 일치하지 않습니다"
+        } else {
+            etConfirmPassword.error = null
         }
     }
 
     /**
-     * 뒤로가기 버튼 처리
+     * 비밀번호 강도 평가
      */
-    override fun onBackPressed() {
-        showCancelConfirmationDialog()
+    private fun getPasswordStrength(password: String): PasswordStrength {
+        if (password.length < 8) return PasswordStrength.WEAK
+
+        var hasLetter = false
+        var hasDigit = false
+        var hasSpecial = false
+
+        for (c in password) {
+            when {
+                c.isLetter() -> hasLetter = true
+                c.isDigit() -> hasDigit = true
+                !c.isLetterOrDigit() -> hasSpecial = true
+            }
+        }
+
+        return when {
+            hasLetter && hasDigit && hasSpecial -> PasswordStrength.STRONG
+            hasLetter && hasDigit -> PasswordStrength.MEDIUM
+            else -> PasswordStrength.WEAK
+        }
     }
 
     /**
-     * 네트워크 연결 상태 확인
+     * 비밀번호 유효성 검사
      */
-    private fun isNetworkAvailable(): Boolean {
-        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val networkCapabilities = connectivityManager.activeNetwork ?: return false
-        val actNw = connectivityManager.getNetworkCapabilities(networkCapabilities) ?: return false
-        return actNw.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    private fun validatePassword(password: String): Boolean {
+        if (password.length < 8) return false
+
+        var hasLetter = false
+        var hasDigit = false
+        var hasSpecial = false
+
+        for (c in password) {
+            when {
+                c.isLetter() -> hasLetter = true
+                c.isDigit() -> hasDigit = true
+                !c.isLetterOrDigit() -> hasSpecial = true
+            }
+        }
+
+        return (hasLetter && hasDigit)  // 최소 문자와 숫자는 필수
+    }
+
+    /**
+     * Firebase 계정 생성
+     */
+    private fun createAccount(email: String, password: String) {
+        btnConfirm.isEnabled = false
+
+        auth.createUserWithEmailAndPassword(email, password)
+            .addOnSuccessListener { result ->
+                val user = result.user
+                if (user != null) {
+                    // 이메일 인증 메일 전송
+                    user.sendEmailVerification()
+                        .addOnSuccessListener {
+                            // Firestore에 사용자 정보 저장
+                            FirestoreHelper.createUserDocument(user.uid, email) { success ->
+                                if (success) {
+                                    Toast.makeText(this, "회원가입 완료! 이메일을 확인해주세요.", Toast.LENGTH_SHORT).show()
+
+                                    // 이메일 인증 화면으로 이동
+                                    val intent = Intent(this, EmailVerificationActivity::class.java)
+                                    intent.putExtra("email", email)
+                                    startActivity(intent)
+                                    finishAffinity()  // 이전 액티비티 모두 종료
+                                } else {
+                                    Toast.makeText(this, "사용자 정보 저장 실패", Toast.LENGTH_SHORT).show()
+                                    btnConfirm.isEnabled = true
+                                }
+                            }
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(this, "인증 메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                            btnConfirm.isEnabled = true
+                        }
+                } else {
+                    Toast.makeText(this, "계정 생성 실패", Toast.LENGTH_SHORT).show()
+                    btnConfirm.isEnabled = true
+                }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "회원가입 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                btnConfirm.isEnabled = true
+            }
     }
 }

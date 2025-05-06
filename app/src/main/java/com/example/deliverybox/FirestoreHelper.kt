@@ -2,157 +2,256 @@ package com.example.deliverybox.utils
 
 import android.util.Log
 import com.example.deliverybox.model.UserData
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.SetOptions
+import java.util.concurrent.TimeUnit
 
-/**
- * Firestore 데이터베이스 관련 유틸리티 클래스
- * 사용자 정보 관리 및 저장 담당
- */
 object FirestoreHelper {
 
+    private val db = FirebaseFirestore.getInstance()
     private const val TAG = "FirestoreHelper"
-    private const val PASSWORD_SET_FLAG = "password_set"
+
+    // Firestore 작업 타임아웃 (초)
+    private const val FIRESTORE_TIMEOUT_SECONDS = 15L
+
+    // 재시도 최대 횟수
+    private const val MAX_RETRIES = 3
 
     /**
-     * 새로운 사용자 문서 생성
-     * 회원가입 시 호출됨
+     * 사용자 문서 생성 - 오류 처리 및 재시도 로직 강화
      */
     fun createUserDocument(uid: String, email: String, onComplete: (Boolean) -> Unit) {
-        val db = FirebaseFirestore.getInstance()
+        createUserDocumentWithRetry(uid, email, 0, onComplete)
+    }
+
+    /**
+     * 사용자 문서 생성 - 재시도 로직 포함
+     */
+    private fun createUserDocumentWithRetry(uid: String, email: String, retryCount: Int, onComplete: (Boolean) -> Unit) {
+        if (retryCount >= MAX_RETRIES) {
+            Log.e(TAG, "사용자 문서 생성 최대 재시도 횟수 초과: $uid")
+            onComplete(false)
+            return
+        }
 
         val userData = hashMapOf(
             "email" to email,
             "createdAt" to FieldValue.serverTimestamp(),
             "nickname" to null,
             "isAdmin" to false,
-            PASSWORD_SET_FLAG to false, // 비밀번호 설정 여부 플래그 추가
-            "boxIds" to emptyList<String>()
+            "emailVerified" to false,
+            "lastLoginAt" to FieldValue.serverTimestamp(),
+            "retryCount" to retryCount  // 디버깅용 재시도 카운트 저장
         )
 
-        db.collection("users").document(uid)
-            .set(userData)
-            .addOnSuccessListener {
+        try {
+            // 제한 시간 설정
+            val docRef = db.collection("users").document(uid)
+            val task = docRef.set(userData)
+
+            try {
+                // 제한 시간 내 작업 완료 시도
+                Tasks.await(task, FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 Log.d(TAG, "사용자 문서 생성 성공: $uid")
                 onComplete(true)
+            } catch (e: Exception) {
+                // 타임아웃 또는 다른 오류 발생 시 재시도
+                Log.w(TAG, "사용자 문서 생성 실패, 재시도 중 (${retryCount + 1}/$MAX_RETRIES): $uid, 오류: ${e.message}")
+
+                // 백오프 시간을 두고 재시도 (지수 백오프)
+                val backoffDelay = (Math.pow(2.0, retryCount.toDouble()) * 1000).toLong()
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    createUserDocumentWithRetry(uid, email, retryCount + 1, onComplete)
+                }, backoffDelay)
             }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "사용자 문서 생성 실패: ${e.message}")
-                onComplete(false)
-            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Firestore 접근 오류: ${e.message}")
+            onComplete(false)
+        }
     }
 
     /**
-     * FCM 토큰 업데이트 (푸시 알림용)
+     * FCM 토큰 업데이트 - 콜백 추가 및 오류 처리 개선
      */
-    fun updateFcmToken(uid: String, token: String) {
-        val db = FirebaseFirestore.getInstance()
-        db.collection("users").document(uid)
-            .update("fcmToken", token)
-            .addOnSuccessListener {
-                Log.d(TAG, "FCM 토큰 업데이트 성공")
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "FCM 토큰 업데이트 실패: ${e.message}")
-            }
-    }
+    fun updateFcmToken(uid: String, token: String, onComplete: ((Boolean) -> Unit)? = null) {
+        try {
+            val updates = mapOf(
+                "fcmToken" to token,
+                "tokenUpdatedAt" to FieldValue.serverTimestamp(),
+                "deviceInfo" to getDeviceInfo()  // 기기 정보 추가
+            )
 
-    /**
-     * 비밀번호 설정 완료 플래그 업데이트
-     * @param uid 사용자 ID
-     * @param isSet 비밀번호 설정 여부 (true: 설정됨, false: 설정 안됨)
-     * @param callback 결과 콜백 (성공/실패)
-     */
-    fun setPasswordFlag(uid: String, isSet: Boolean, callback: ((Boolean) -> Unit)? = null) {
-        val db = FirebaseFirestore.getInstance()
-        db.collection("users").document(uid)
-            .update(PASSWORD_SET_FLAG, isSet)
-            .addOnSuccessListener {
-                Log.d(TAG, "비밀번호 설정 플래그 업데이트: $isSet")
-                callback?.invoke(true)
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "비밀번호 설정 플래그 업데이트 실패: ${e.message}")
-                callback?.invoke(false)
-            }
-    }
-
-    /**
-     * 비밀번호 설정 여부 확인
-     * @param uid 사용자 ID
-     * @param callback 결과 콜백 (true: 설정됨, false: 설정 안됨, null: 오류)
-     */
-    fun checkPasswordSet(uid: String, callback: (Boolean?) -> Unit) {
-        val db = FirebaseFirestore.getInstance()
-        db.collection("users").document(uid)
-            .get()
-            .addOnSuccessListener { document ->
-                if (document != null && document.exists()) {
-                    val isPasswordSet = document.getBoolean(PASSWORD_SET_FLAG) ?: false
-                    Log.d(TAG, "비밀번호 설정 여부 확인: $isPasswordSet")
-                    callback(isPasswordSet)
-                } else {
-                    Log.d(TAG, "사용자 문서가 존재하지 않음")
-                    callback(false)
+            db.collection("users").document(uid)
+                .update(updates)
+                .addOnSuccessListener {
+                    Log.d(TAG, "FCM 토큰 업데이트 성공: $uid")
+                    onComplete?.invoke(true)
                 }
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "비밀번호 설정 여부 확인 실패: ${e.message}")
-                callback(null)
-            }
+                .addOnFailureListener { e ->
+                    // 문서가 없으면 생성 시도
+                    if (e is FirebaseFirestoreException && e.code == FirebaseFirestoreException.Code.NOT_FOUND) {
+                        db.collection("users").document(uid)
+                            .set(updates, SetOptions.merge())
+                            .addOnSuccessListener {
+                                Log.d(TAG, "FCM 토큰 업데이트 (문서 생성) 성공: $uid")
+                                onComplete?.invoke(true)
+                            }
+                            .addOnFailureListener { innerE ->
+                                Log.e(TAG, "FCM 토큰 저장 실패 (문서 생성 시도): $uid, 오류: ${innerE.message}")
+                                onComplete?.invoke(false)
+                            }
+                    } else {
+                        Log.e(TAG, "FCM 토큰 업데이트 실패: $uid, 오류: ${e.message}")
+                        onComplete?.invoke(false)
+                    }
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "FCM 토큰 업데이트 중 예외 발생: ${e.message}")
+            onComplete?.invoke(false)
+        }
     }
 
     /**
-     * 사용자 데이터 가져오기
-     * @param uid 사용자 ID
-     * @param callback 결과 콜백 (UserData 객체 또는 null)
+     * 사용자 데이터 가져오기 - 오류 처리 및 캐시 기능 추가
      */
     fun getUserData(uid: String, callback: (UserData?) -> Unit) {
-        val db = FirebaseFirestore.getInstance()
-        db.collection("users").document(uid)
-            .get()
-            .addOnSuccessListener { document ->
-                if (document != null && document.exists()) {
-                    val email = document.getString("email") ?: ""
-                    val displayName = document.getString("nickname") ?: ""
-                    val photoUrl = document.getString("photoUrl") ?: ""
-                    val boxIds = document.get("boxIds") as? List<String> ?: emptyList()
+        try {
+            // 오프라인 캐시 사용 활성화
+            val docRef = db.collection("users").document(uid)
+            docRef.get(com.google.firebase.firestore.Source.CACHE)
+                .addOnSuccessListener { cacheDoc ->
+                    // 캐시에서 데이터 가져오기 성공
+                    if (cacheDoc != null && cacheDoc.exists()) {
+                        Log.d(TAG, "사용자 데이터 캐시에서 로드: $uid")
+                        parseAndReturnUserData(cacheDoc, uid, callback)
 
-                    // 비밀번호 설정 여부 확인
-                    val isPasswordSet = document.getBoolean(PASSWORD_SET_FLAG) ?: false
-
-                    Log.d(TAG, "사용자 데이터 불러오기 성공: $email")
-                    val userData = UserData(uid, email, displayName, photoUrl, boxIds)
-                    userData.isPasswordSet = isPasswordSet
-
-                    callback(userData)
-                } else {
-                    Log.e(TAG, "사용자 문서가 존재하지 않음")
-                    callback(null)
+                        // 백그라운드에서 최신 데이터 가져오기 시도
+                        refreshUserDataInBackground(uid)
+                    } else {
+                        // 캐시에 없으면 서버에서 시도
+                        docRef.get(com.google.firebase.firestore.Source.SERVER)
+                            .addOnSuccessListener { serverDoc ->
+                                if (serverDoc != null && serverDoc.exists()) {
+                                    Log.d(TAG, "사용자 데이터 서버에서 로드: $uid")
+                                    parseAndReturnUserData(serverDoc, uid, callback)
+                                } else {
+                                    Log.e(TAG, "사용자 문서 없음: $uid")
+                                    callback(null)
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e(TAG, "사용자 데이터 서버 로드 실패: $uid, 오류: ${e.message}")
+                                callback(null)
+                            }
+                    }
                 }
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "사용자 데이터 로드 실패: ${e.message}")
-                callback(null)
-            }
+                .addOnFailureListener { e ->
+                    // 캐시 접근 실패 시 서버에서 직접 시도
+                    Log.w(TAG, "사용자 데이터 캐시 접근 실패: $uid, 서버 시도 중, 오류: ${e.message}")
+
+                    docRef.get(com.google.firebase.firestore.Source.SERVER)
+                        .addOnSuccessListener { serverDoc ->
+                            if (serverDoc != null && serverDoc.exists()) {
+                                parseAndReturnUserData(serverDoc, uid, callback)
+                            } else {
+                                callback(null)
+                            }
+                        }
+                        .addOnFailureListener { serverE ->
+                            Log.e(TAG, "사용자 데이터 서버 로드 실패: $uid, 오류: ${serverE.message}")
+                            callback(null)
+                        }
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "사용자 데이터 조회 중 예외 발생: ${e.message}")
+            callback(null)
+        }
     }
 
     /**
-     * 회원 탈퇴 시 사용자 데이터 삭제
-     * @param uid 사용자 ID
-     * @param callback 결과 콜백 (성공/실패)
+     * 사용자 문서에서 데이터 파싱
      */
-    fun deleteUserData(uid: String, callback: ((Boolean) -> Unit)? = null) {
-        val db = FirebaseFirestore.getInstance()
-        db.collection("users").document(uid)
-            .delete()
-            .addOnSuccessListener {
-                Log.d(TAG, "사용자 데이터 삭제 성공: $uid")
-                callback?.invoke(true)
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "사용자 데이터 삭제 실패: ${e.message}")
-                callback?.invoke(false)
-            }
+    private fun parseAndReturnUserData(document: com.google.firebase.firestore.DocumentSnapshot, uid: String, callback: (UserData?) -> Unit) {
+        try {
+            val email = document.getString("email") ?: ""
+            val displayName = document.getString("nickname") ?: ""
+            val photoUrl = document.getString("photoUrl") ?: ""
+            val boxIds = document.get("boxIds") as? List<String> ?: emptyList()
+
+            // 로그인 시간 업데이트 (백그라운드)
+            db.collection("users").document(uid)
+                .update("lastLoginAt", FieldValue.serverTimestamp())
+                .addOnFailureListener { e ->
+                    Log.w(TAG, "로그인 시간 업데이트 실패: $uid, 오류: ${e.message}")
+                }
+
+            callback(UserData(uid, email, displayName, photoUrl, boxIds))
+        } catch (e: Exception) {
+            Log.e(TAG, "사용자 데이터 파싱 실패: $uid, 오류: ${e.message}")
+            callback(null)
+        }
+    }
+
+    /**
+     * 백그라운드에서 최신 사용자 데이터 가져오기
+     */
+    private fun refreshUserDataInBackground(uid: String) {
+        try {
+            db.collection("users").document(uid)
+                .get(com.google.firebase.firestore.Source.SERVER)
+                .addOnSuccessListener { document ->
+                    Log.d(TAG, "사용자 데이터 백그라운드 갱신 성공: $uid")
+                }
+                .addOnFailureListener { e ->
+                    Log.w(TAG, "사용자 데이터 백그라운드 갱신 실패: $uid, 오류: ${e.message}")
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "사용자 데이터 백그라운드 갱신 중 예외 발생: ${e.message}")
+        }
+    }
+
+    /**
+     * 이메일 인증 상태 업데이트
+     */
+    fun updateEmailVerification(uid: String, verified: Boolean, onComplete: (Boolean) -> Unit) {
+        try {
+            val updates = mapOf(
+                "emailVerified" to verified,
+                "emailVerifiedAt" to if (verified) FieldValue.serverTimestamp() else null
+            )
+
+            db.collection("users").document(uid)
+                .update(updates)
+                .addOnSuccessListener {
+                    Log.d(TAG, "이메일 인증 상태 업데이트 성공: $uid, verified: $verified")
+                    onComplete(true)
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "이메일 인증 상태 업데이트 실패: $uid, 오류: ${e.message}")
+                    onComplete(false)
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "이메일 인증 상태 업데이트 중 예외 발생: ${e.message}")
+            onComplete(false)
+        }
+    }
+
+    /**
+     * 현재 기기 정보 가져오기
+     */
+    private fun getDeviceInfo(): Map<String, String> {
+        return try {
+            mapOf(
+                "manufacturer" to android.os.Build.MANUFACTURER,
+                "model" to android.os.Build.MODEL,
+                "androidVersion" to android.os.Build.VERSION.RELEASE,
+                "sdkVersion" to android.os.Build.VERSION.SDK_INT.toString()
+            )
+        } catch (e: Exception) {
+            mapOf("error" to "기기 정보 가져오기 실패: ${e.message}")
+        }
     }
 }

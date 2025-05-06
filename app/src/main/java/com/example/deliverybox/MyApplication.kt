@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.example.deliverybox.utils.AccountUtils
 import com.google.firebase.FirebaseApp
 
