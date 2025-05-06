@@ -1,8 +1,10 @@
 package com.example.deliverybox.utils
 
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.example.deliverybox.model.UserData
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -43,6 +45,7 @@ object FirestoreHelper {
             "nickname" to null,
             "isAdmin" to false,
             "emailVerified" to false,
+            "passwordSet" to false,
             "lastLoginAt" to FieldValue.serverTimestamp(),
             "retryCount" to retryCount  // 디버깅용 재시도 카운트 저장
         )
@@ -180,6 +183,7 @@ object FirestoreHelper {
             val displayName = document.getString("nickname") ?: ""
             val photoUrl = document.getString("photoUrl") ?: ""
             val boxIds = document.get("boxIds") as? List<String> ?: emptyList()
+            val isPasswordSet = document.getBoolean("passwordSet") ?: false
 
             // 로그인 시간 업데이트 (백그라운드)
             db.collection("users").document(uid)
@@ -188,7 +192,7 @@ object FirestoreHelper {
                     Log.w(TAG, "로그인 시간 업데이트 실패: $uid, 오류: ${e.message}")
                 }
 
-            callback(UserData(uid, email, displayName, photoUrl, boxIds))
+            callback(UserData(uid, email, displayName, photoUrl, boxIds, isPasswordSet))
         } catch (e: Exception) {
             Log.e(TAG, "사용자 데이터 파싱 실패: $uid, 오류: ${e.message}")
             callback(null)
@@ -236,6 +240,32 @@ object FirestoreHelper {
         } catch (e: Exception) {
             Log.e(TAG, "이메일 인증 상태 업데이트 중 예외 발생: ${e.message}")
             onComplete(false)
+        }
+    }
+
+    /**
+     * 임시 비밀번호 해시 검증
+     * 보안을 위해 비밀번호 자체가 아닌 해시값만 저장하고 검증
+     */
+    fun verifyTempPasswordHash(uid: String, tempPassword: String, callback: (Boolean) -> Unit) {
+        try {
+            db.collection("users").document(uid)
+                .get()
+                .addOnSuccessListener { doc ->
+                    val storedHash = doc?.getLong("tempPasswordHash")
+
+                    if (storedHash != null && storedHash.toInt() == tempPassword.hashCode()) {
+                        callback(true)
+                    } else {
+                        callback(false)
+                    }
+                }
+                .addOnFailureListener {
+                    callback(false)
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "임시 비밀번호 검증 실패: ${e.message}")
+            callback(false)
         }
     }
 
