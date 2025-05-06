@@ -29,14 +29,10 @@ class AccountCleanupWorker(
             // 작업 실행 코드가 단일 콜백에서 완료되도록 CompletableDeferred 사용
             val result = CompletableDeferred<Result>()
 
-            AccountUtils.cleanupOldUnverifiedAccounts(onComplete = { count ->
+            AccountUtils.cleanupOldUnverifiedAccounts { count ->
                 Log.d(TAG, "${count}개의 미인증 계정 정리 완료")
                 result.complete(Result.success())
-            })
-
-
-
-
+            }
 
             // 완료 될 때까지 대기
             return@withContext result.await()
