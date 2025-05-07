@@ -1,12 +1,14 @@
-package com.example.deliverybox
+package adapter
 
 import android.graphics.Typeface
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.*
+import android.widget.ImageButton
+import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.example.deliverybox.R
 
 class   SharedUserAdapter(
     private val userList: List<Pair<String, String>>,
@@ -36,7 +38,12 @@ class   SharedUserAdapter(
                 holder.emailText.setTypeface(null, Typeface.NORMAL)
                 holder.emailText.setTextColor(ContextCompat.getColor(context, R.color.gray))
                 holder.emailText.textAlignment = View.TEXT_ALIGNMENT_CENTER
-                holder.itemView.setBackgroundColor(ContextCompat.getColor(context, android.R.color.transparent))
+                holder.itemView.setBackgroundColor(
+                    ContextCompat.getColor(
+                        context,
+                        android.R.color.transparent
+                    )
+                )
                 holder.deleteButton.visibility = View.GONE
             }
 
@@ -45,16 +52,31 @@ class   SharedUserAdapter(
                 holder.emailText.setTypeface(null, Typeface.ITALIC)
                 holder.emailText.setTextColor(ContextCompat.getColor(context, R.color.gray))
                 holder.emailText.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
-                holder.itemView.setBackgroundColor(ContextCompat.getColor(context, R.color.gray_background))
+                holder.itemView.setBackgroundColor(
+                    ContextCompat.getColor(
+                        context,
+                        R.color.gray_background
+                    )
+                )
                 holder.deleteButton.visibility = View.VISIBLE
             }
 
             else -> {
                 // 정상 사용자
                 holder.emailText.setTypeface(null, Typeface.NORMAL)
-                holder.emailText.setTextColor(ContextCompat.getColor(context, android.R.color.black))
+                holder.emailText.setTextColor(
+                    ContextCompat.getColor(
+                        context,
+                        android.R.color.black
+                    )
+                )
                 holder.emailText.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
-                holder.itemView.setBackgroundColor(ContextCompat.getColor(context, android.R.color.white))
+                holder.itemView.setBackgroundColor(
+                    ContextCompat.getColor(
+                        context,
+                        android.R.color.white
+                    )
+                )
                 holder.deleteButton.visibility = View.VISIBLE
             }
         }

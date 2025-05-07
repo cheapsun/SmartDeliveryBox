@@ -1,12 +1,11 @@
 package com.example.deliverybox
 
 import android.os.Bundle
-import android.view.View
 import android.widget.Toast
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.deliverybox.adapter.LogAdapter
+import adapter.LogAdapter
 import com.example.deliverybox.adapter.PackageAdapter
 import com.example.deliverybox.databinding.ActivityBoxDetailBinding
 import com.example.deliverybox.model.LogItem

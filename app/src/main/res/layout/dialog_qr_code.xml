@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center">
+
+    <TextView
+        android:id="@+id/tv_qr_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="도어락 QR 코드"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"/>
+
+    <ImageView
+        android:id="@+id/iv_qr_code"
+        android:layout_width="250dp"
+        android:layout_height="250dp"
+        android:scaleType="fitCenter"
+        android:layout_margin="16dp"
+        android:contentDescription="QR 코드"/>
+
+    <TextView
+        android:id="@+id/tv_timer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="남은 시간: 00:45"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#FF4444"
+        android:layout_marginTop="8dp"/>
+
+    <TextView
+        android:id="@+id/tv_qr_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="이 QR 코드는 45초간 유효합니다"
+        android:textSize="14sp"
+        android:layout_marginTop="8dp"/>
+
+    <Button
+        android:id="@+id/btn_refresh"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="새로고침"
+        android:layout_marginTop="8dp"/>
+
+    <Button
+        android:id="@+id/btn_close"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="닫기"
+        android:layout_marginTop="8dp"/>
+</LinearLayout>

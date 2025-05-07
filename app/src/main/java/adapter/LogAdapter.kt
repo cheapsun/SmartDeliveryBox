@@ -1,4 +1,4 @@
-package com.example.deliverybox.adapter
+package adapter
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
