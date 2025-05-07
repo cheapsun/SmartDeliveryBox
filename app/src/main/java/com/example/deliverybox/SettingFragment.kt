@@ -11,13 +11,19 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.cardview.widget.CardView
 import androidx.fragment.app.Fragment
+import com.example.deliverybox.databinding.FragmentSettingBinding
+import com.example.deliverybox.utils.SharedPrefsHelper
+import com.example.deliverybox.utils.AccountUtils
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 class SettingFragment : Fragment() {
 
-    private lateinit var layoutProfile: CardView   // ✅ CardView로 수정
-    private lateinit var layoutBoxInfo: CardView   // ✅ CardView로 수정
+    private var _binding: FragmentSettingBinding? = null
+    private val binding get() = _binding!!
+
+    private lateinit var layoutProfile: CardView
+    private lateinit var layoutBoxInfo: CardView
     private lateinit var tvUserEmail: TextView
     private lateinit var tvBoxInfo: TextView
     private lateinit var btnAddSharedUser: ImageButton
@@ -31,52 +37,45 @@ class SettingFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View? {
-        val view = inflater.inflate(R.layout.fragment_setting, container, false)
+        _binding = FragmentSettingBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
 
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
 
         // View 연결
-        layoutProfile = view.findViewById(R.id.layout_profile)
-        layoutBoxInfo = view.findViewById(R.id.layout_box_info)
-        tvUserEmail = view.findViewById(R.id.tv_user_email)
-        tvBoxInfo = view.findViewById(R.id.tv_box_info)
-        btnAddSharedUser = view.findViewById(R.id.btn_add_shared_user)
-        layoutNotificationSettings = view.findViewById(R.id.layout_notification_settings)
-        layoutLogout = view.findViewById(R.id.layout_logout)
-        layoutDeleteAccount = view.findViewById(R.id.layout_delete_account)
+        layoutProfile = binding.layoutProfile
+        layoutBoxInfo = binding.layoutBoxInfo
+        tvUserEmail = binding.tvUserEmail
+        tvBoxInfo = binding.tvBoxInfo
+        btnAddSharedUser = binding.btnAddSharedUser
+        layoutNotificationSettings = binding.layoutNotificationSettings
+        layoutLogout = binding.layoutLogout
+        layoutDeleteAccount = binding.layoutDeleteAccount
 
-        // 🔹 Firestore 사용자 정보 로드
+        // 사용자 정보 로드
         loadUserData()
 
-        // 🔹 버튼 클릭 리스너 설정
+        // 리스너 설정
         setupListeners()
-
-        return view
     }
 
     private fun loadUserData() {
         val currentUser = auth.currentUser
         if (currentUser != null) {
-            val uid = currentUser.uid
-
-            // 이메일 표시
             tvUserEmail.text = currentUser.email
-
-            // 박스 정보 가져오기
-            db.collection("users").document(uid)
+            db.collection("users").document(currentUser.uid)
                 .get()
                 .addOnSuccessListener { document ->
-                    if (document != null && document.exists()) {
-                        val boxIds = document.get("boxIds") as? List<String> ?: emptyList()
-                        val boxCount = boxIds.size
-                        val sharedUserUids = document.get("sharedUserUids") as? List<String> ?: emptyList()
-                        val memberCount = sharedUserUids.size + 1  // 공유 사용자 수 + 본인
-
-                        tvBoxInfo.text = "택배함 ${boxCount}개 | ${memberCount}명"
-                    } else {
-                        tvBoxInfo.text = "택배함 0개 | 0명"
-                    }
+                    val boxIds = document.get("boxIds") as? List<String> ?: emptyList()
+                    val boxCount = boxIds.size
+                    val sharedUserUids = document.get("sharedUserUids") as? List<String> ?: emptyList()
+                    val memberCount = sharedUserUids.size + 1
+                    tvBoxInfo.text = "택배함 ${boxCount}개 | ${memberCount}명"
                 }
                 .addOnFailureListener {
                     tvBoxInfo.text = "택배함 0개 | 0명"
@@ -85,48 +84,49 @@ class SettingFragment : Fragment() {
     }
 
     private fun setupListeners() {
-        // ➕ 공유 사용자 추가
+        // 공유 사용자 추가
         btnAddSharedUser.setOnClickListener {
             startActivity(Intent(requireContext(), AddSharedUserActivity::class.java))
         }
 
-        // 🔵 프로필 클릭 → ProfileActivity 이동
+        // 프로필 이동
         layoutProfile.setOnClickListener {
             startActivity(Intent(requireContext(), ProfileActivity::class.java))
         }
 
-        // 🔵 택배함 클릭 → SharedUserManageActivity 이동
+        // 택배함 정보 이동
         layoutBoxInfo.setOnClickListener {
             startActivity(Intent(requireContext(), SharedUserManageActivity::class.java))
         }
 
-        // 알림 설정 클릭
+        // 알림 설정
         layoutNotificationSettings.setOnClickListener {
             Toast.makeText(requireContext(), "알림 설정은 추후 지원 예정입니다.", Toast.LENGTH_SHORT).show()
         }
 
-        // 로그아웃 클릭
+        // 로그아웃 클릭: 자동 로그인 해제 및 세션 정리
         layoutLogout.setOnClickListener {
             auth.signOut()
+            SharedPrefsHelper.setAutoLogin(requireContext(), false)
+            SharedPrefsHelper.clearLoginSession(requireContext())
+
             Toast.makeText(requireContext(), "로그아웃되었습니다.", Toast.LENGTH_SHORT).show()
             startActivity(Intent(requireContext(), SplashActivity::class.java))
             requireActivity().finishAffinity()
         }
 
-        // 회원탈퇴 클릭
+        // 회원탈퇴
         layoutDeleteAccount.setOnClickListener {
             deleteAccount()
         }
     }
 
     private fun deleteAccount() {
-        val user = auth.currentUser
-        val uid = user?.uid ?: return
+        val user = auth.currentUser ?: return
+        val uid = user.uid
 
-        // Authentication 계정 삭제
         user.delete()
             .addOnSuccessListener {
-                // Firestore 사용자 문서 삭제
                 db.collection("users").document(uid)
                     .delete()
                     .addOnSuccessListener {
@@ -138,8 +138,13 @@ class SettingFragment : Fragment() {
                         Toast.makeText(requireContext(), "Firestore 삭제 실패", Toast.LENGTH_SHORT).show()
                     }
             }
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), "회원탈퇴 실패: ${it.message}", Toast.LENGTH_SHORT).show()
+            .addOnFailureListener { e ->
+                Toast.makeText(requireContext(), "회원탈퇴 실패: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

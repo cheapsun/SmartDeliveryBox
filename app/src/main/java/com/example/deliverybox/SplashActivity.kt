@@ -121,16 +121,40 @@ class SplashActivity : AppCompatActivity() {
         }
     }
 
+    // 수정된 checkLoginSession 메서드
     private fun checkLoginSession() {
-        if (!isSessionValid()) {
-            Log.d(TAG, "세션 만료, 자동 로그아웃")
+        val currentUser = auth.currentUser
+
+        // Firebase에 이미 로그인된 상태이고 자동 로그인 설정이 켜져 있으면
+        if (currentUser != null && SharedPrefsHelper.isAutoLoginEnabled(this)) {
+            // 세션 유효성 확인
+            currentUser.getIdToken(true)
+                .addOnSuccessListener { tokenResult ->
+                    // 토큰 갱신 성공 = 세션 유효
+                    Log.d(TAG, "Firebase 토큰 유효, 자동 로그인 진행")
+                    updateLoginSession()
+                    navigateToMain()
+                }
+                .addOnFailureListener { e ->
+                    // 토큰 갱신 실패 = 세션 만료
+                    Log.d(TAG, "Firebase 토큰 만료: ${e.message}")
+                    auth.signOut()
+                    SharedPrefsHelper.clearLoginSession(this)
+                    navigateToLogin()
+                }
+        }
+        // 자동 로그인 설정이 꺼져 있거나 세션이 만료된 경우
+        else if (!isSessionValid() || currentUser == null) {
+            Log.d(TAG, "세션 만료 또는 자동 로그인 비활성화")
             auth.signOut()
             SharedPrefsHelper.clearLoginSession(this)
             navigateToLogin()
-            return
         }
-        updateLoginSession()
-        navigateToMain()
+        // 이미 로그인되어 있고 세션이 유효한 경우
+        else {
+            updateLoginSession()
+            navigateToMain()
+        }
     }
 
     private fun isSessionValid(): Boolean {

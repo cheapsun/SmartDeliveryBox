@@ -4,11 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.util.Base64
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import java.security.KeyStore
 
 /**
  * SharedPreferences 관련 유틸리티
@@ -30,6 +28,9 @@ object SharedPrefsHelper {
     private const val KEY_THEME_MODE = "theme_mode"
     private const val KEY_LAST_APP_VERSION = "last_app_version"
 
+    // 자동 로그인 설정 키 🆕
+    private const val KEY_AUTO_LOGIN = "auto_login"
+
     /**
      * 일반 SharedPreferences 가져오기
      */
@@ -42,7 +43,6 @@ object SharedPrefsHelper {
      */
     private fun getSecurePrefs(context: Context): SharedPreferences {
         return try {
-            // 마스터 키 생성
             val spec = KeyGenParameterSpec.Builder(
                 MasterKey.DEFAULT_MASTER_KEY_ALIAS,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
@@ -56,7 +56,6 @@ object SharedPrefsHelper {
                 .setKeyGenParameterSpec(spec)
                 .build()
 
-            // 암호화된 SharedPreferences 생성
             EncryptedSharedPreferences.create(
                 context,
                 SECURE_PREFS_FILENAME,
@@ -65,7 +64,6 @@ object SharedPrefsHelper {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            // 암호화 저장소 생성 실패 시 일반 저장소 사용
             Log.e(TAG, "보안 SharedPreferences 생성 실패: ${e.message}")
             context.getSharedPreferences(SECURE_PREFS_FILENAME, Context.MODE_PRIVATE)
         }
@@ -201,15 +199,26 @@ object SharedPrefsHelper {
      */
     fun clearAllPreferences(context: Context) {
         try {
-            // 일반 설정 초기화
             getPrefs(context).edit().clear().apply()
-
-            // 보안 설정 초기화
             getSecurePrefs(context).edit().clear().apply()
-
             Log.d(TAG, "모든 설정 초기화 완료")
         } catch (e: Exception) {
             Log.e(TAG, "설정 초기화 중 오류: ${e.message}")
         }
+    }
+
+
+    /**
+     * 자동 로그인 설정 저장 🆕
+     */
+    fun setAutoLogin(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_AUTO_LOGIN, enabled).apply()
+    }
+
+    /**
+     * 자동 로그인 설정 확인 🆕
+     */
+    fun isAutoLoginEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_AUTO_LOGIN, false)
     }
 }

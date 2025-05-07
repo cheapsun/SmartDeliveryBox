@@ -15,6 +15,7 @@ import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.example.deliverybox.databinding.ActivityLoginBinding
 import com.example.deliverybox.utils.FirestoreHelper
+import com.example.deliverybox.utils.SharedPrefsHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
@@ -28,81 +29,56 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 뷰 바인딩 초기화
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Firebase 인증 객체 초기화
         auth = FirebaseAuth.getInstance()
 
-        // 로그인 버튼 상태 설정
+        // 자동 로그인 확인
+        if (SharedPrefsHelper.isAutoLoginEnabled(this) && auth.currentUser != null) {
+            navigateToMain()
+            return
+        }
+
         setupLoginButtonState()
-
-        // "가입하기" 텍스트의 색상 스타일 설정
         setSignupText()
-
-        // 버튼 클릭 리스너 설정
         setupClickListeners()
     }
 
-    /**
-     * 이메일과 비밀번호 입력값에 따라 로그인 버튼 활성화 상태 및 색상 설정
-     */
     private fun setupLoginButtonState() {
         val watcher = object : android.text.TextWatcher {
             override fun afterTextChanged(s: android.text.Editable?) {
                 val email = binding.etEmail.text.toString().trim()
                 val password = binding.etPassword.text.toString().trim()
                 binding.btnLogin.isEnabled = email.isNotEmpty() && password.isNotEmpty()
-
-                // 버튼 색상 변경
-                if (binding.btnLogin.isEnabled) {
-                    binding.btnLogin.setBackgroundColor(Color.parseColor("#448AFF")) // 활성화 색상
-                } else {
-                    binding.btnLogin.setBackgroundColor(Color.parseColor("#AABEFF")) // 비활성화 색상
-                }
+                binding.btnLogin.setBackgroundColor(
+                    if (binding.btnLogin.isEnabled) Color.parseColor("#448AFF")
+                    else Color.parseColor("#AABEFF")
+                )
             }
-
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         }
-
         binding.etEmail.addTextChangedListener(watcher)
         binding.etPassword.addTextChangedListener(watcher)
     }
 
-    /**
-     * 모든 클릭 리스너 설정
-     */
     private fun setupClickListeners() {
-        // 로그인 버튼 클릭
         binding.btnLogin.setOnClickListener {
             val email = binding.etEmail.text.toString().trim()
             val password = binding.etPassword.text.toString().trim()
             login(email, password)
         }
-
-        // 회원가입 텍스트 클릭
         binding.tvSignupFull.setOnClickListener {
             startActivity(Intent(this, SignupEmailActivity::class.java))
         }
-
-        // 비밀번호 찾기 텍스트 클릭
-        binding.tvForgotPassword.setOnClickListener {
-            showForgotPasswordDialog()
-        }
+        binding.tvForgotPassword.setOnClickListener { showForgotPasswordDialog() }
     }
 
-    /**
-     * 입력값 유효성 검사
-     */
     private fun validateInputs(): Boolean {
         var isValid = true
-
         val email = binding.etEmail.text.toString().trim()
         val password = binding.etPassword.text.toString()
-
-        // 이메일 검사
         if (email.isEmpty()) {
             binding.layoutEmail.error = "이메일을 입력해주세요"
             isValid = false
@@ -112,75 +88,39 @@ class LoginActivity : AppCompatActivity() {
         } else {
             binding.layoutEmail.error = null
         }
-
-        // 비밀번호 검사
         if (password.isEmpty()) {
             binding.layoutPassword.error = "비밀번호를 입력해주세요"
             isValid = false
         } else {
             binding.layoutPassword.error = null
         }
-
         return isValid
     }
 
-    /**
-     * 로그인 처리
-     */
     private fun login(email: String, password: String) {
-        // 입력값 검증
         if (!validateInputs()) return
-
-        // 네트워크 연결 확인
         if (!isNetworkAvailable()) {
             Toast.makeText(this, "인터넷 연결을 확인해주세요", Toast.LENGTH_SHORT).show()
             return
         }
-
-        // 로딩 표시 시작
         binding.progressLogin.visibility = View.VISIBLE
         binding.btnLogin.isEnabled = false
 
-        // Firebase로 로그인 시도
         auth.signInWithEmailAndPassword(email, password)
             .addOnSuccessListener { result ->
                 val user = result.user
-
-                // 이메일 인증 확인
                 if (user != null && !user.isEmailVerified) {
-                    // 인증되지 않은 이메일
                     binding.progressLogin.visibility = View.GONE
                     binding.btnLogin.isEnabled = true
-
-                    // 이메일 인증 화면으로 이동할지 묻기
                     showEmailVerificationPrompt(email)
                     return@addOnSuccessListener
                 }
-
                 val uid = user?.uid ?: return@addOnSuccessListener
-
-                // FCM 토큰 업데이트 (푸시 알림용)
-                updateFcmToken(uid)
-
-                // Firestore에서 사용자 데이터 가져오기
-                FirestoreHelper.getUserData(uid) { userData ->
-                    binding.progressLogin.visibility = View.GONE
-
-                    if (userData != null) {
-                        Toast.makeText(this, "로그인 성공!", Toast.LENGTH_SHORT).show()
-                        startActivity(Intent(this, MainActivity::class.java))
-                        finish() // 현재 화면 종료
-                    } else {
-                        binding.btnLogin.isEnabled = true
-                        Toast.makeText(this, "사용자 정보 불러오기 실패", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                onLoginSuccess(uid)
             }
             .addOnFailureListener { e ->
                 binding.progressLogin.visibility = View.GONE
                 binding.btnLogin.isEnabled = true
-
-                // 오류 유형에 따른 맞춤 메시지 표시
                 val errorMessage = when (e) {
                     is FirebaseAuthInvalidUserException -> "존재하지 않는 계정입니다"
                     is FirebaseAuthInvalidCredentialsException -> "이메일 또는 비밀번호가 일치하지 않습니다"
@@ -191,103 +131,98 @@ class LoginActivity : AppCompatActivity() {
             }
     }
 
-    /**
-     * 이메일 인증 안내 대화상자 표시
-     */
+    // 로그인 성공 후 처리 메서드
+    private fun onLoginSuccess(uid: String) {
+        try {
+            // FCM 토큰 업데이트
+            updateFcmToken(uid)
+            // 자동 로그인 활성화
+            SharedPrefsHelper.setAutoLogin(this, true)
+            // 마지막 로그인 시간 저장
+            SharedPrefsHelper.setLastLoginTime(this, System.currentTimeMillis())
+
+            FirestoreHelper.getUserData(uid) { userData ->
+                binding.progressLogin.visibility = View.GONE
+                if (userData != null) {
+                    Toast.makeText(this, "로그인 성공!", Toast.LENGTH_SHORT).show()
+                    navigateToMain()
+                } else {
+                    binding.btnLogin.isEnabled = true
+                    Toast.makeText(this, "사용자 정보 불러오기 실패", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("LoginActivity", "로그인 성공 처리 중 오류: ${e.message}")
+            binding.progressLogin.visibility = View.GONE
+            binding.btnLogin.isEnabled = true
+        }
+    }
+
+    private fun navigateToMain() {
+        startActivity(Intent(this, MainActivity::class.java)
+            .apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK })
+        finish()
+    }
+
     private fun showEmailVerificationPrompt(email: String) {
         androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("이메일 인증 필요")
             .setMessage("로그인하려면 이메일 인증이 필요합니다. 인증 화면으로 이동하시겠습니까?")
             .setPositiveButton("이동") { _, _ ->
-                // 이메일 인증 화면으로 이동
-                val intent = Intent(this, EmailVerificationActivity::class.java)
-                intent.putExtra("email", email)
-                startActivity(intent)
+                Intent(this, EmailVerificationActivity::class.java).apply {
+                    putExtra("email", email)
+                    startActivity(this)
+                }
             }
             .setNegativeButton("취소", null)
             .create()
             .show()
     }
 
-    /**
-     * FCM 토큰 업데이트 - 푸시 알림용
-     */
     private fun updateFcmToken(uid: String) {
         FirebaseMessaging.getInstance().token
-            .addOnSuccessListener { token ->
-                FirestoreHelper.updateFcmToken(uid, token)
-            }
-            .addOnFailureListener { e ->
-                // 토큰 가져오기 실패 처리 - 로그만 남기고 진행 (심각한 오류 아님)
-                Log.e("LoginActivity", "FCM 토큰 가져오기 실패: ${e.message}")
-            }
+            .addOnSuccessListener { token -> FirestoreHelper.updateFcmToken(uid, token) }
+            .addOnFailureListener { e -> Log.e("LoginActivity", "FCM 토큰 가져오기 실패: ${e.message}") }
     }
 
-    /**
-     * "회원가입" 텍스트에 색상 스타일 적용
-     */
     private fun setSignupText() {
         val fullText = "계정이 없으신가요? 가입하기"
         val spannableString = SpannableString(fullText)
-        val startIndex = fullText.indexOf("가입하기")
-        val endIndex = startIndex + "가입하기".length
-
+        val start = fullText.indexOf("가입하기")
         spannableString.setSpan(
             ForegroundColorSpan(Color.parseColor("#007BFF")),
-            startIndex,
-            endIndex,
+            start,
+            start + "가입하기".length,
             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
         )
-
         binding.tvSignupFull.text = spannableString
     }
 
-    /**
-     * 비밀번호 찾기 다이얼로그 표시
-     */
     private fun showForgotPasswordDialog() {
         val builder = androidx.appcompat.app.AlertDialog.Builder(this)
-        val dialogView = layoutInflater.inflate(R.layout.dialog_forgot_password, null)
-        val etDialogEmail = dialogView.findViewById<android.widget.EditText>(R.id.et_dialog_email)
-
-        builder.setView(dialogView)
+        val view = layoutInflater.inflate(R.layout.dialog_forgot_password, null)
+        val etEmail = view.findViewById<android.widget.EditText>(R.id.et_dialog_email)
+        builder.setView(view)
             .setTitle("비밀번호 재설정")
             .setPositiveButton("전송") { dialog, _ ->
-                val email = etDialogEmail.text.toString().trim()
-                if (email.isNotEmpty()) {
-                    sendPasswordResetEmail(email)
-                } else {
-                    Toast.makeText(this, "이메일을 입력해주세요", Toast.LENGTH_SHORT).show()
-                }
+                val email = etEmail.text.toString().trim()
+                if (email.isNotEmpty()) sendPasswordResetEmail(email) else Toast.makeText(this, "이메일을 입력해주세요", Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
             }
-            .setNegativeButton("취소") { dialog, _ ->
-                dialog.dismiss()
-            }
-            .create()
+            .setNegativeButton("취소", null)
             .show()
     }
 
-    /**
-     * 비밀번호 재설정 이메일 전송
-     */
     private fun sendPasswordResetEmail(email: String) {
         auth.sendPasswordResetEmail(email)
-            .addOnSuccessListener {
-                Toast.makeText(this, "비밀번호 재설정 이메일이 전송되었습니다", Toast.LENGTH_SHORT).show()
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "이메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+            .addOnSuccessListener { Toast.makeText(this, "비밀번호 재설정 이메일이 전송되었습니다", Toast.LENGTH_SHORT).show() }
+            .addOnFailureListener { e -> Toast.makeText(this, "이메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show() }
     }
 
-    /**
-     * 네트워크 연결 상태 확인
-     */
     private fun isNetworkAvailable(): Boolean {
-        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val networkCapabilities = connectivityManager.activeNetwork ?: return false
-        val actNw = connectivityManager.getNetworkCapabilities(networkCapabilities) ?: return false
-        return actNw.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val nw = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(nw) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }

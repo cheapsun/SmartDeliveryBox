@@ -71,12 +71,8 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupClickListeners() {
-        binding.btnAddBox.setOnClickListener {
-            showRegisterBoxDialog()
-        }
-        binding.btnEmptyAddBox.setOnClickListener {
-            showRegisterBoxDialog()
-        }
+        binding.btnAddBox.setOnClickListener { showRegisterBoxDialog() }
+        binding.btnEmptyAddBox.setOnClickListener { showRegisterBoxDialog() }
     }
 
     private fun showRegisterBoxDialog() {
@@ -89,6 +85,9 @@ class HomeFragment : Fragment() {
     }
 
     private fun loadBoxList() {
+        // Fragment가 이미 분리되었는지 확인
+        if (!isAdded || _binding == null) return
+
         val userUid = auth.currentUser?.uid ?: return
         Log.d("HomeFragment", "사용자 UID: $userUid 데이터 로딩 시작")
 
@@ -121,14 +120,9 @@ class HomeFragment : Fragment() {
                 }
 
                 val boxesToProcess = mutableMapOf<String, String>()
-                if (!boxAliases.isNullOrEmpty()) {
-                    boxesToProcess.putAll(boxAliases)
-                    Log.d("HomeFragment", "boxAliases 필드에서 ${boxAliases.size}개 박스 발견")
-                }
-
+                boxAliases?.let { boxesToProcess.putAll(it) }
                 if (!mainBoxId.isNullOrEmpty() && !boxesToProcess.containsKey(mainBoxId)) {
                     boxesToProcess[mainBoxId] = "내 택배함"
-                    Log.d("HomeFragment", "mainBoxId 필드에서 추가 박스($mainBoxId) 발견")
                 }
 
                 if (boxesToProcess.isEmpty()) {
@@ -140,17 +134,13 @@ class HomeFragment : Fragment() {
                 var processedCount = 0
 
                 for ((boxId, alias) in boxesToProcess) {
-
                     val currentBoxId = boxId
                     val currentAlias = alias
 
-                    Log.d("HomeFragment", "박스 처리 시작: $boxId ($alias)")
-
-                    db.collection("boxes").document(boxId)
+                    db.collection("boxes").document(currentBoxId)
                         .get()
                         .addOnSuccessListener { boxDoc ->
                             if (!boxDoc.exists()) {
-                                Log.w("HomeFragment", "존재하지 않는 박스: $boxId")
                                 processedCount++
                                 if (processedCount == boxesToProcess.size) {
                                     updateEmptyState(boxList.isEmpty())
@@ -159,11 +149,9 @@ class HomeFragment : Fragment() {
                             }
 
                             val boxName = boxDoc.getString("boxName") ?: "택배함"
-                            Log.d("HomeFragment", "박스 정보 로드 성공: $boxId ($boxName)")
-
                             val boxInfo = BoxInfo(
-                                boxId = boxId,
-                                alias = alias,
+                                boxId = currentBoxId,
+                                alias = currentAlias,
                                 boxName = boxName,
                                 packageCount = 0,
                                 doorLocked = true
@@ -173,15 +161,13 @@ class HomeFragment : Fragment() {
                             adapter.notifyDataSetChanged()
                             updateEmptyState(boxList.isEmpty())
 
-                            db.collection("boxes").document(boxId)
+                            db.collection("boxes").document(currentBoxId)
                                 .collection("packages")
                                 .whereEqualTo("isDelivered", false)
                                 .get()
                                 .addOnSuccessListener { packagesSnapshot ->
                                     val packageCount = packagesSnapshot.size()
-                                    Log.d("HomeFragment", "박스 $currentBoxId 의 택배 수: $packageCount")
-
-                                    val index = boxList.indexOfFirst { it.boxId == boxId }
+                                    val index = boxList.indexOfFirst { it.boxId == currentBoxId }
                                     if (index >= 0) {
                                         boxList[index] = boxList[index].copy(packageCount = packageCount)
                                         adapter.notifyItemChanged(index)
@@ -194,7 +180,6 @@ class HomeFragment : Fragment() {
                             processedCount++
                         }
                         .addOnFailureListener { e ->
-                            Log.e("HomeFragment", "박스 정보 로드 실패: ${e.message}")
                             processedCount++
                             if (processedCount == boxesToProcess.size) {
                                 updateEmptyState(boxList.isEmpty())
@@ -205,13 +190,16 @@ class HomeFragment : Fragment() {
     }
 
     private fun updateEmptyState(isEmpty: Boolean = boxList.isEmpty()) {
-        binding.layoutEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
-        binding.recyclerViewBoxes.visibility = if (isEmpty) View.GONE else View.VISIBLE
+        _binding?.let { binding ->
+            binding.layoutEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
+            binding.recyclerViewBoxes.visibility = if (isEmpty) View.GONE else View.VISIBLE
+        }
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
+        // 리스너 제거 및 바인딩 해제
         boxesListener?.remove()
         _binding = null
+        super.onDestroyView()
     }
 }

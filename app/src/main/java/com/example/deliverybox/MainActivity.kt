@@ -7,6 +7,7 @@ import androidx.fragment.app.Fragment
 import com.example.deliverybox.databinding.ActivityMainBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.example.deliverybox.HomeFragment
 
 class MainActivity : AppCompatActivity() {
 

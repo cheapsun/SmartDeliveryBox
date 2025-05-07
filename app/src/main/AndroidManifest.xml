@@ -20,7 +20,7 @@
             android:name=".RegisterBoxActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.box.BoxDetailActivity"
+            android:name=".BoxDetailActivity"
             android:exported="false" />
         <activity
             android:name=".SharedUserManageActivity"

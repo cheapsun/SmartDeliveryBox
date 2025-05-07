@@ -160,6 +160,25 @@ object AccountUtils {
     }
 
     /**
+     * 로그아웃 및 세션 정리
+     */
+    fun logout(context: Context, callback: (() -> Unit)? = null) {
+        try {
+            // Firebase 로그아웃
+            FirebaseAuth.getInstance().signOut()
+            // 자동 로그인 설정 해제
+            SharedPrefsHelper.setAutoLogin(context, false)
+            // 세션 정보 삭제
+            SharedPrefsHelper.clearLoginSession(context)
+            Log.d(TAG, "로그아웃 성공")
+            callback?.invoke()
+        } catch (e: Exception) {
+            Log.e(TAG, "로그아웃 중 오류: ${e.message}")
+            callback?.invoke()
+        }
+    }
+
+    /**
      * 현재 사용자 가입 상태 확인
      * 로그인되지 않음 / 이메일 인증 완료 / 비밀번호 설정 완료 상태로 분류
      */
@@ -200,15 +219,6 @@ object AccountUtils {
     }
 
     /**
-     * 가입 상태를 나타내는 enum
-     */
-    enum class SignupState {
-        NOT_LOGGED_IN,
-        EMAIL_VERIFIED,
-        COMPLETED
-    }
-
-    /**
      * 예외 처리 결과를 담는 데이터 클래스
      */
     data class ExceptionResult(
@@ -218,7 +228,6 @@ object AccountUtils {
 
     /**
      * 예외 상황(가입 흐름) 확인 후 callback으로 결과 전달
-     * 아래 메소드로 완전히 교체됨
      */
     fun checkExceptionCases(callback: (ExceptionResult) -> Unit) {
         val auth = FirebaseAuth.getInstance()
@@ -241,14 +250,11 @@ object AccountUtils {
                 return@addOnCompleteListener
             }
 
-            // 수정된 부분: 이메일이 인증되지 않은 경우
             if (!updated.isEmailVerified) {
-                // NOT_LOGGED_IN 상태로 변경하고 이메일 정보 제공
                 callback(ExceptionResult(SignupState.NOT_LOGGED_IN, updated.email))
                 return@addOnCompleteListener
             }
 
-            // 이메일이 인증된 경우 비밀번호 설정 여부 확인
             FirebaseFirestore.getInstance()
                 .collection("users")
                 .document(updated.uid)
@@ -270,7 +276,6 @@ object AccountUtils {
 
     /**
      * 회원가입 상태 저장
-     * 아래 메소드로 완전히 교체됨
      */
     fun saveSignupState(state: SignupState, email: String?, password: String? = null) {
         try {
@@ -278,17 +283,14 @@ object AccountUtils {
             signupEmail = email
             tempPassword = password
 
-            // 로그 추가 - 상태 저장 확인
             Log.d(TAG, "회원가입 상태 저장: $state, 이메일: $email")
 
-            // SharedPreferences에도 백업 저장하여 앱 강제 종료 시에도 상태 유지
             val context = MyApplication.getAppContext()
             if (context != null) {
                 val prefs = context.getSharedPreferences("signup_state", Context.MODE_PRIVATE)
                 prefs.edit().apply {
                     putString("state", state.name)
                     putString("email", email)
-                    // 비밀번호는 보안상 저장하지 않음
                     apply()
                 }
             }
@@ -306,17 +308,8 @@ object AccountUtils {
             val stateStr = prefs.getString("state", null)
             val email = prefs.getString("email", null)
 
-            val state = if (stateStr != null) {
-                try {
-                    SignupState.valueOf(stateStr)
-                } catch (e: Exception) {
-                    SignupState.NOT_LOGGED_IN
-                }
-            } else {
-                SignupState.NOT_LOGGED_IN
-            }
+            val state = stateStr?.let { runCatching { SignupState.valueOf(it) }.getOrNull() } ?: SignupState.NOT_LOGGED_IN
 
-            // 메모리 변수 업데이트
             signupState = state
             signupEmail = email
 
@@ -356,16 +349,14 @@ object AccountUtils {
                 return@addOnCompleteListener
             }
 
-            val db = FirebaseFirestore.getInstance()
-            db.collection("users").document(user.uid)
+            FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(user.uid)
                 .get()
                 .addOnSuccessListener { doc ->
                     val passwordSet = doc.getBoolean("passwordSet") ?: false
-                    if (passwordSet) {
-                        callback(SignupState.COMPLETED, user.email, null)
-                    } else {
-                        callback(SignupState.EMAIL_VERIFIED, user.email, null)
-                    }
+                    val state = if (passwordSet) SignupState.COMPLETED else SignupState.EMAIL_VERIFIED
+                    callback(state, user.email, null)
                 }
                 .addOnFailureListener {
                     callback(SignupState.NOT_LOGGED_IN, null, null)
@@ -375,7 +366,6 @@ object AccountUtils {
 
     /**
      * 앱 시작시 인증되지 않은 계정 정리 및 상태 확인 통합 메소드
-     * 앱 처음 시작할 때 호출해야 함
      */
     fun handleAppStartup(context: Context, callback: (Boolean) -> Unit) {
         try {
@@ -388,7 +378,6 @@ object AccountUtils {
                 return
             }
 
-            // 이미 로그인된 사용자의 상태 확인을 위해 새로고침
             currentUser.reload()
                 .addOnSuccessListener {
                     val refreshedUser = auth.currentUser
@@ -398,12 +387,9 @@ object AccountUtils {
                         return@addOnSuccessListener
                     }
 
-                    // 인증되지 않은 계정인 경우 정리
                     if (!refreshedUser.isEmailVerified) {
-                        // Firebase DB에서 생성 시간 확인하여 유예 기간 이상 지난 계정은 삭제
                         checkAndCleanupTempAccount(callback)
                     } else {
-                        // 세션 유효성 업데이트
                         SharedPrefsHelper.setLastLoginTime(context, System.currentTimeMillis())
                         callback(true)
                     }
@@ -469,7 +455,6 @@ object AccountUtils {
 
     /**
      * 인증 완료 후 다음 단계로 이동
-     * EmailVerificationActivity 내에서 사용
      */
     fun handleVerificationComplete(
         email: String,
@@ -486,12 +471,17 @@ object AccountUtils {
                 db.collection("users").document(uid)
                     .update("emailVerified", true)
                     .addOnSuccessListener { onSuccess() }
-                    .addOnFailureListener { e ->
-                        onError("상태 업데이트 실패: ${e.message}")
-                    }
+                    .addOnFailureListener { e -> onError("상태 업데이트 실패: ${e.message}") }
             }
-            .addOnFailureListener { e ->
-                onError("로그인 실패: ${e.message}")
-            }
+            .addOnFailureListener { e -> onError("로그인 실패: ${e.message}") }
+    }
+
+    /**
+     * 가입 상태를 나타내는 enum
+     */
+    enum class SignupState {
+        NOT_LOGGED_IN,
+        EMAIL_VERIFIED,
+        COMPLETED
     }
 }
