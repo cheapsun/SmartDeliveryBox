@@ -1,5 +1,5 @@
 // app/src/main/java/com/example/deliverybox/NotificationFragment.kt
-package com.example.deliverybox
+package com.example.deliverybox.notification
 
 import android.os.Bundle
 import android.util.Log
@@ -11,6 +11,7 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import adapter.NotificationAdapter
+import com.example.deliverybox.R
 import com.example.deliverybox.model.Notification
 import com.example.deliverybox.model.NotificationType
 import com.google.firebase.auth.FirebaseAuth

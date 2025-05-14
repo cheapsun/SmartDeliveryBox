@@ -1,4 +1,4 @@
-package com.example.deliverybox
+package com.example.deliverybox.lock
 
 import android.app.Dialog
 import android.graphics.Color
@@ -15,16 +15,15 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import adapter.LogAdapter
-import com.example.deliverybox.model.BoxInfo
-import com.example.deliverybox.model.LogItem
-import com.example.deliverybox.utils.QrCodeGenerator
+import com.example.deliverybox.R
+import com.example.deliverybox.box.BoxInfo
+import adapter.LogItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.Timestamp
 import java.util.Date
-import java.util.HashMap
 
 class DoorlockFragment : Fragment() {
 
@@ -232,11 +231,13 @@ class DoorlockFragment : Fragment() {
                                 val alias = boxAliases[boxId] ?: "내 택배함"
                                 val boxName = boxDoc.getString("boxName") ?: "택배함"
 
-                                boxesList.add(BoxInfo(
+                                boxesList.add(
+                                    BoxInfo(
                                     boxId = boxId,
                                     alias = alias,
                                     boxName = boxName
-                                ))
+                                )
+                                )
                             }
 
                             if (loadedCount == boxIds.size) {

@@ -1,4 +1,4 @@
-package com.example.deliverybox
+package com.example.deliverybox.shareduser
 
 import android.content.Intent
 import android.os.Bundle

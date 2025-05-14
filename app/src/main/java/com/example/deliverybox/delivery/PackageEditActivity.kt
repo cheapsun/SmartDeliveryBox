@@ -1,12 +1,10 @@
-package com.example.deliverybox
+package com.example.deliverybox.delivery
 
 import android.app.AlertDialog
-import android.content.Intent
 import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.isVisible
-import com.example.deliverybox.model.Package
+import com.example.deliverybox.R
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.firestore.FirebaseFirestore
 

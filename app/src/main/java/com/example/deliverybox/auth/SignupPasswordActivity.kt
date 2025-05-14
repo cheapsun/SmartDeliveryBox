@@ -1,4 +1,4 @@
-package com.example.deliverybox
+package com.example.deliverybox.auth
 
 import android.content.Intent
 import android.graphics.Color
@@ -13,13 +13,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.example.deliverybox.databinding.ActivitySignupPasswordBinding
+import com.example.deliverybox.repository.FirebaseAuthRepository
 import com.example.deliverybox.utils.AccountUtils
-import com.example.deliverybox.utils.FirestoreHelper
+import com.example.deliverybox.utils.PasswordStrengthEvaluator
 import com.google.android.material.textfield.TextInputEditText
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
+import com.example.deliverybox.home.MainActivity
 
 class SignupPasswordActivity : AppCompatActivity() {
 
@@ -42,9 +43,8 @@ class SignupPasswordActivity : AppCompatActivity() {
     private lateinit var btnConfirm: Button
     private lateinit var progressBarLogin: ProgressBar
 
-    // Firebase
-    private lateinit var auth: FirebaseAuth
-    private lateinit var db: FirebaseFirestore
+    // Repository
+    private lateinit var authRepository: FirebaseAuthRepository
 
     // 상태
     private var email: String = ""
@@ -52,19 +52,12 @@ class SignupPasswordActivity : AppCompatActivity() {
 
     private val TAG = "SignupPasswordActivity"
 
-    enum class PasswordStrength(val color: Int, val label: String) {
-        WEAK(Color.RED, "약함"),
-        MEDIUM(Color.parseColor("#FFA500"), "중간"),
-        STRONG(Color.GREEN, "강함")
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivitySignupPasswordBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        auth = FirebaseAuth.getInstance()
-        db   = FirebaseFirestore.getInstance()
+        authRepository = FirebaseAuthRepository()
 
         // Intent에서 email, fromVerification 처리
         email = intent.getStringExtra("email") ?: ""
@@ -86,7 +79,7 @@ class SignupPasswordActivity : AppCompatActivity() {
         }
 
         // 세션 만료 시 자동 로그인 안내
-        if (fromVerification && auth.currentUser == null) {
+        if (fromVerification && authRepository.getCurrentUser() == null) {
             Log.w(TAG, "세션 만료 - 자동 로그인")
             Intent(this, LoginActivity::class.java).apply {
                 putExtra("email", email)
@@ -126,16 +119,18 @@ class SignupPasswordActivity : AppCompatActivity() {
         btnConfirm.setOnClickListener {
             val pw = etPassword.text.toString()
             val confirm = etConfirmPassword.text.toString()
+
             if (!validatePassword(pw)) {
                 Toast.makeText(this, "안전한 비밀번호를 입력해 주세요", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+
             if (pw != confirm) {
                 etConfirmPassword.error = "비밀번호가 일치하지 않습니다"
                 return@setOnClickListener
             }
-            if (fromVerification) updatePassword(auth.currentUser!!, pw)
-            else createAccount(email, pw)
+
+            setPassword(pw)
         }
 
         // 제목/버튼 텍스트 변경
@@ -150,12 +145,12 @@ class SignupPasswordActivity : AppCompatActivity() {
         val confirm = etConfirmPassword.text.toString()
 
         // 강도 평가 및 UI 업데이트
-        val strength = evaluateStrength(pw)
+        val strength = PasswordStrengthEvaluator.evaluate(pw)
         updateStrengthUI(strength)
 
         // 버튼 활성화 로직
         val isMatch = pw.isNotEmpty() && pw == confirm
-        val isSufficient = strength != PasswordStrength.WEAK
+        val isSufficient = strength != com.example.deliverybox.utils.PasswordStrength.WEAK
         val enabled = isMatch && isSufficient
 
         btnConfirm.isEnabled = enabled
@@ -172,32 +167,19 @@ class SignupPasswordActivity : AppCompatActivity() {
         }
     }
 
-    private fun evaluateStrength(pw: String): PasswordStrength {
-        val hasLetter  = pw.any { it.isLetter() }
-        val hasDigit   = pw.any { it.isDigit() }
-        val hasSpecial = pw.any { !it.isLetterOrDigit() }
-
-        return when {
-            pw.length < 8                          -> PasswordStrength.WEAK
-            hasLetter && hasDigit && hasSpecial   -> PasswordStrength.STRONG
-            hasLetter && hasDigit                  -> PasswordStrength.MEDIUM
-            else                                   -> PasswordStrength.WEAK
-        }
-    }
-
-    private fun updateStrengthUI(str: PasswordStrength) {
+    private fun updateStrengthUI(str: com.example.deliverybox.utils.PasswordStrength) {
         val gray = Color.parseColor("#E0E0E0")
         segWeak.setBackgroundColor(gray)
         segMedium.setBackgroundColor(gray)
         segStrong.setBackgroundColor(gray)
 
         when (str) {
-            PasswordStrength.WEAK -> segWeak.setBackgroundColor(str.color)
-            PasswordStrength.MEDIUM -> {
+            com.example.deliverybox.utils.PasswordStrength.WEAK -> segWeak.setBackgroundColor(str.color)
+            com.example.deliverybox.utils.PasswordStrength.MEDIUM -> {
                 segWeak.setBackgroundColor(str.color)
                 segMedium.setBackgroundColor(str.color)
             }
-            PasswordStrength.STRONG -> {
+            com.example.deliverybox.utils.PasswordStrength.STRONG -> {
                 segWeak.setBackgroundColor(str.color)
                 segMedium.setBackgroundColor(str.color)
                 segStrong.setBackgroundColor(str.color)
@@ -209,84 +191,43 @@ class SignupPasswordActivity : AppCompatActivity() {
     }
 
     private fun validatePassword(password: String): Boolean {
-        if (password.length < 8) return false
-        val hasL = password.any { it.isLetter() }
-        val hasD = password.any { it.isDigit() }
-        return hasL && hasD
+        val strength = PasswordStrengthEvaluator.evaluate(password)
+        return strength != com.example.deliverybox.utils.PasswordStrength.WEAK
     }
 
-    private fun createAccount(email: String, password: String) {
-        btnConfirm.isEnabled = false
-        auth.createUserWithEmailAndPassword(email, password)
-            .addOnSuccessListener { result ->
-                result.user?.let { user ->
-                    user.sendEmailVerification()
-                        .addOnSuccessListener {
-                            FirestoreHelper.createUserDocument(user.uid, email) { success ->
-                                if (success) {
-                                    Toast.makeText(this, "회원가입 완료! 이메일을 확인해주세요.", Toast.LENGTH_SHORT).show()
-                                    Intent(this, EmailVerificationActivity::class.java).apply {
-                                        putExtra("email", email)
-                                        startActivity(this)
-                                    }
-                                    finishAffinity()
-                                } else {
-                                    Toast.makeText(this, "사용자 정보 저장 실패", Toast.LENGTH_SHORT).show()
-                                    btnConfirm.isEnabled = true
-                                }
-                            }
-                        }
-                        .addOnFailureListener { e ->
-                            Toast.makeText(this, "인증 메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-                            btnConfirm.isEnabled = true
-                        }
-                } ?: run {
-                    Toast.makeText(this, "계정 생성 실패", Toast.LENGTH_SHORT).show()
-                    btnConfirm.isEnabled = true
-                }
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "회원가입 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-                btnConfirm.isEnabled = true
-            }
-    }
-
-    private fun updatePassword(user: FirebaseUser, newPassword: String) {
+    private fun setPassword(password: String) {
         btnConfirm.isEnabled = false
         progressBarLogin.visibility = View.VISIBLE
 
-        user.updatePassword(newPassword)
-            .addOnSuccessListener {
-                db.collection("users").document(user.uid)
-                    .update(
-                        mapOf(
-                            "passwordSet" to true,
-                            "tempPasswordHash" to null
-                        )
-                    )
-                    .addOnSuccessListener {
+        lifecycleScope.launch {
+            try {
+                val result = authRepository.setPassword(password)
+
+                result.fold(
+                    onSuccess = {
                         progressBarLogin.visibility = View.GONE
-                        AccountUtils.saveSignupState(
-                            AccountUtils.SignupState.COMPLETED, email
-                        )
-                        Toast.makeText(this, "비밀번호 설정 완료!", Toast.LENGTH_SHORT).show()
-                        Intent(this, MainActivity::class.java).apply {
+                        AccountUtils.saveSignupState(AccountUtils.SignupState.COMPLETED, email)
+
+                        Toast.makeText(this@SignupPasswordActivity, "비밀번호 설정 완료!", Toast.LENGTH_SHORT).show()
+                        Intent(this@SignupPasswordActivity, MainActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                             startActivity(this)
                         }
                         finish()
-                    }
-                    .addOnFailureListener { e ->
+                    },
+                    onFailure = { e ->
                         progressBarLogin.visibility = View.GONE
-                        Toast.makeText(this, "상태 업데이트 실패: ${e.message}", Toast.LENGTH_SHORT).show()
                         btnConfirm.isEnabled = true
+                        Toast.makeText(this@SignupPasswordActivity, "비밀번호 설정 실패: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
-            }
-            .addOnFailureListener { e ->
+                )
+            } catch (e: Exception) {
                 progressBarLogin.visibility = View.GONE
-                Toast.makeText(this, "비밀번호 업데이트 실패: ${e.message}", Toast.LENGTH_SHORT).show()
                 btnConfirm.isEnabled = true
+                Log.e(TAG, "비밀번호 설정 중 오류: ${e.message}", e)
+                Toast.makeText(this@SignupPasswordActivity, "오류가 발생했습니다: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
     }
 
     override fun onBackPressed() {
@@ -295,12 +236,32 @@ class SignupPasswordActivity : AppCompatActivity() {
             .setMessage("취소하면 나중에 다시 설정해야 합니다.")
             .setPositiveButton("취소") { _, _ ->
                 if (fromVerification) {
-                    auth.signOut()
-                    startActivity(Intent(this, LoginActivity::class.java))
-                    finish()
-                } else super.onBackPressed()
+                    // suspend 함수는 코루틴 안에서 호출
+                    lifecycleScope.launch {
+                        try {
+                            authRepository.logout()  // 이제 에러 없이 호출 가능
+
+                            // 로그아웃 후 로그인 화면으로 이동
+                            val intent = Intent(
+                                this@SignupPasswordActivity,
+                                LoginActivity::class.java
+                            ).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                                        Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            }
+                            startActivity(intent)
+                            finish()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "로그아웃 중 오류", e)
+                            finish()
+                        }
+                    }
+                } else {
+                    super.onBackPressed()
+                }
             }
             .setNegativeButton("계속 진행", null)
             .show()
     }
+
 }

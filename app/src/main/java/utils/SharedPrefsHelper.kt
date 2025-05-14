@@ -8,12 +8,7 @@ import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
-/**
- * SharedPreferences 관련 유틸리티
- * 사용자 세션 및 설정 저장
- */
 object SharedPrefsHelper {
-
     private const val TAG = "SharedPrefsHelper"
     private const val PREFS_FILENAME = "deliverybox_prefs"
     private const val SECURE_PREFS_FILENAME = "deliverybox_secure_prefs"
@@ -22,14 +17,12 @@ object SharedPrefsHelper {
     private const val KEY_LAST_LOGIN_TIME = "last_login_time"
     private const val KEY_USER_ID = "user_id"
     private const val KEY_SESSION_TOKEN = "session_token"
+    private const val KEY_AUTO_LOGIN = "auto_login"
 
     // 일반 설정 키
     private const val KEY_NOTIFICATION_ENABLED = "notification_enabled"
     private const val KEY_THEME_MODE = "theme_mode"
     private const val KEY_LAST_APP_VERSION = "last_app_version"
-
-    // 자동 로그인 설정 키 🆕
-    private const val KEY_AUTO_LOGIN = "auto_login"
 
     /**
      * 일반 SharedPreferences 가져오기
@@ -195,6 +188,20 @@ object SharedPrefsHelper {
     }
 
     /**
+     * 자동 로그인 설정 저장
+     */
+    fun setAutoLogin(context: Context, enabled: Boolean) {
+        getSecurePrefs(context).edit().putBoolean(KEY_AUTO_LOGIN, enabled).apply()
+    }
+
+    /**
+     * 자동 로그인 설정 확인
+     */
+    fun isAutoLoginEnabled(context: Context): Boolean {
+        return getSecurePrefs(context).getBoolean(KEY_AUTO_LOGIN, false)
+    }
+
+    /**
      * 모든 설정 초기화 (앱 재설치 등)
      */
     fun clearAllPreferences(context: Context) {
@@ -205,20 +212,5 @@ object SharedPrefsHelper {
         } catch (e: Exception) {
             Log.e(TAG, "설정 초기화 중 오류: ${e.message}")
         }
-    }
-
-
-    /**
-     * 자동 로그인 설정 저장 🆕
-     */
-    fun setAutoLogin(context: Context, enabled: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_AUTO_LOGIN, enabled).apply()
-    }
-
-    /**
-     * 자동 로그인 설정 확인 🆕
-     */
-    fun isAutoLoginEnabled(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_AUTO_LOGIN, false)
     }
 }

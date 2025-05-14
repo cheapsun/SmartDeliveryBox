@@ -1,4 +1,4 @@
-package com.example.deliverybox.model
+package com.example.deliverybox.delivery
 
 // Firestore의 택배 문서 데이터
 data class Package(

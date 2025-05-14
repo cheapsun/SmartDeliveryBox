@@ -1,4 +1,4 @@
-package com.example.deliverybox
+package com.example.deliverybox.box
 
 import android.os.Bundle
 import android.widget.Toast
@@ -6,10 +6,14 @@ import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import adapter.LogAdapter
-import com.example.deliverybox.adapter.PackageAdapter
+import adapter.PackageAdapter
+import com.example.deliverybox.delivery.PackageEditActivity
+import com.example.deliverybox.delivery.PackageListActivity
+import com.example.deliverybox.delivery.RegisterPackageActivity
 import com.example.deliverybox.databinding.ActivityBoxDetailBinding
-import com.example.deliverybox.model.LogItem
-import com.example.deliverybox.model.PackageItem
+import com.example.deliverybox.delivery.Package
+import adapter.LogItem
+import com.example.deliverybox.delivery.PackageItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -161,7 +165,7 @@ class BoxDetailActivity : AppCompatActivity() {
 
                 if (snapshots != null && !snapshots.isEmpty) {
                     for (doc in snapshots) {
-                        val pkg = doc.toObject(com.example.deliverybox.model.Package::class.java)
+                        val pkg = doc.toObject(Package::class.java)
                         packagesList.add(PackageItem(doc.id, pkg))
 
                     }

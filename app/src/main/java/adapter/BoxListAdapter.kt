@@ -5,7 +5,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.deliverybox.R
 import com.example.deliverybox.databinding.ItemBoxBinding
-import com.example.deliverybox.model.BoxInfo
+import com.example.deliverybox.box.BoxInfo
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

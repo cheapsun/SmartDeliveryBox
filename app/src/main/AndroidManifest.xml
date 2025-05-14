@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".MyApplication"
         android:allowBackup="true"
@@ -14,43 +16,43 @@
         android:theme="@style/Theme.DeliveryBox"
         tools:targetApi="31">
         <activity
-            android:name=".EmailVerificationActivity"
+            android:name=".auth.EmailVerificationActivity"
             android:exported="false" />
         <activity
-            android:name=".RegisterBoxActivity"
+            android:name=".box.RegisterBoxActivity"
             android:exported="false" />
         <activity
-            android:name=".BoxDetailActivity"
+            android:name=".box.BoxDetailActivity"
             android:exported="false" />
         <activity
-            android:name=".SharedUserManageActivity"
+            android:name=".shareduser.SharedUserManageActivity"
             android:exported="false" />
         <activity
-            android:name=".ProfileActivity"
+            android:name=".profile.ProfileActivity"
             android:exported="false" />
         <activity
-            android:name=".LoginActivity"
+            android:name=".auth.LoginActivity"
             android:exported="false" />
         <activity
-            android:name=".SignupPasswordActivity"
+            android:name=".auth.SignupPasswordActivity"
             android:exported="false" />
         <activity
-            android:name=".PackageEditActivity"
+            android:name=".delivery.PackageEditActivity"
             android:exported="false" />
         <activity
-            android:name=".PackageListActivity"
+            android:name=".delivery.PackageListActivity"
             android:exported="false" />
         <activity
-            android:name=".RegisterPackageActivity"
+            android:name=".delivery.RegisterPackageActivity"
             android:exported="false" />
         <activity
-            android:name=".AddSharedUserActivity"
+            android:name=".shareduser.AddSharedUserActivity"
             android:exported="false" />
         <activity
-            android:name=".SignupEmailActivity"
+            android:name=".auth.SignupEmailActivity"
             android:exported="false" />
         <activity
-            android:name=".MainActivity"
+            android:name=".home.MainActivity"
             android:exported="false" />
         <activity
             android:name=".SplashActivity"

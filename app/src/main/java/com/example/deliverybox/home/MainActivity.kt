@@ -1,13 +1,18 @@
-package com.example.deliverybox
+package com.example.deliverybox.home
 
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
+import com.example.deliverybox.lock.DoorlockFragment
+import com.example.deliverybox.notification.NotificationFragment
+import com.example.deliverybox.R
+import com.example.deliverybox.settings.SettingFragment
 import com.example.deliverybox.databinding.ActivityMainBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.example.deliverybox.HomeFragment
+import com.example.deliverybox.auth.LoginActivity
+import com.example.deliverybox.delivery.PackageFragment
 
 class MainActivity : AppCompatActivity() {
 

@@ -1,4 +1,4 @@
-package com.example.deliverybox
+package com.example.deliverybox.settings
 
 import android.content.Intent
 import android.os.Bundle
@@ -11,9 +11,12 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.cardview.widget.CardView
 import androidx.fragment.app.Fragment
+import com.example.deliverybox.shareduser.AddSharedUserActivity
+import com.example.deliverybox.shareduser.SharedUserManageActivity
+import com.example.deliverybox.SplashActivity
 import com.example.deliverybox.databinding.FragmentSettingBinding
+import com.example.deliverybox.profile.ProfileActivity
 import com.example.deliverybox.utils.SharedPrefsHelper
-import com.example.deliverybox.utils.AccountUtils
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 

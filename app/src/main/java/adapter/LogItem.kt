@@ -1,4 +1,4 @@
-package com.example.deliverybox.model
+package adapter
 
 data class LogItem(
     val id: String,

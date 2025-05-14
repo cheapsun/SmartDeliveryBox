@@ -1,10 +1,8 @@
-package com.example.deliverybox.utils
+package utils
 
 import android.util.Log
-import androidx.annotation.VisibleForTesting
 import com.example.deliverybox.model.UserData
 import com.google.android.gms.tasks.Tasks
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException

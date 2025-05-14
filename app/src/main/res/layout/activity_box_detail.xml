@@ -82,7 +82,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="3"
+                                android:text="0"
                                 android:textSize="20sp"
                                 android:textStyle="bold"
                                 android:textColor="#6A8DFF"/>
@@ -106,7 +106,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="2"
+                                android:text="0"
                                 android:textSize="20sp"
                                 android:textStyle="bold"
                                 android:textColor="#4CAF50"/>
@@ -130,7 +130,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="5"
+                                android:text="0"
                                 android:textSize="20sp"
                                 android:textStyle="bold"
                                 android:textColor="#FFA000"/>

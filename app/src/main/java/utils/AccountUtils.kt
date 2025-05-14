@@ -5,28 +5,30 @@ import android.util.Log
 import com.example.deliverybox.MyApplication
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
+import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 
-/**
- * 계정 관련 유틸리티 클래스
- * 임시 계정 삭제 및 가입 상태 확인 등 계정 관련 기능을 담당
- */
 object AccountUtils {
 
     private const val TAG = "AccountUtils"
     private const val DELETION_TIMEOUT_SECONDS = 10L
     private const val UNVERIFIED_ACCOUNT_LIMIT_DAYS = 7L
 
-    // 회원가입 진행 상태 저장 (앱 내에서 일시적으로 사용)
-    private var signupState: SignupState = SignupState.NOT_LOGGED_IN
-    private var signupEmail: String? = null
-    private var tempPassword: String? = null
+    // 회원가입 상태 저장
+    enum class SignupState {
+        NOT_LOGGED_IN,
+        EMAIL_VERIFIED,
+        COMPLETED
+    }
+
+    data class ExceptionResult(
+        val state: SignupState,
+        val email: String? = null
+    )
 
     /**
      * 임시 계정을 안전하게 삭제하고 로그아웃 처리
-     * 앱 시작시 호출하여 미인증 계정 정리
      */
     fun deleteTempAccountAndSignOut(callback: (() -> Unit)? = null) {
         val auth = FirebaseAuth.getInstance()
@@ -38,45 +40,51 @@ object AccountUtils {
             return
         }
 
-        // 현재 인증되지 않은 계정이라면 삭제 처리
         if (!currentUser.isEmailVerified) {
             try {
                 val uid = currentUser.uid
                 val db = FirebaseFirestore.getInstance()
 
-                db.collection("users").document(uid)
-                    .get()
-                    .addOnSuccessListener { document ->
-                        if (document != null && document.exists()) {
-                            val createdAt = document.getTimestamp("createdAt")
+                db.runTransaction { transaction ->
+                    val userDoc = transaction.get(db.collection("users").document(uid))
 
-                            if (createdAt != null) {
-                                val now = System.currentTimeMillis()
-                                val createdTime = createdAt.toDate().time
-                                val elapsedDays = TimeUnit.MILLISECONDS.toDays(now - createdTime)
-
-                                if (elapsedDays >= UNVERIFIED_ACCOUNT_LIMIT_DAYS) {
-                                    deleteUserAccount(currentUser, uid, callback)
-                                } else {
-                                    Log.d(TAG, "미인증 계정 유예 기간 내: $uid (${elapsedDays}일 경과)")
-                                    auth.signOut()
-                                    callback?.invoke()
-                                }
-                            } else {
-                                Log.w(TAG, "계정 생성 시간 정보 없음, 삭제 보류: $uid")
-                                auth.signOut()
-                                callback?.invoke()
-                            }
-                        } else {
-                            Log.d(TAG, "사용자 문서 없는 미인증 계정, 삭제: $uid")
-                            deleteUserAccount(currentUser, uid, callback)
-                        }
+                    if (!userDoc.exists()) {
+                        Log.d(TAG, "사용자 문서 없음, 계정 삭제 진행")
+                        return@runTransaction true
                     }
-                    .addOnFailureListener { e ->
-                        Log.e(TAG, "Firestore 조회 실패: ${e.message}")
+
+                    val createdAt = userDoc.getTimestamp("createdAt")
+                    if (createdAt == null) {
+                        Log.w(TAG, "계정 생성 시간 정보 없음, 삭제 진행")
+                        return@runTransaction true
+                    }
+
+                    val now = System.currentTimeMillis()
+                    val createdTime = createdAt.toDate().time
+                    val elapsedDays = TimeUnit.MILLISECONDS.toDays(now - createdTime)
+
+                    if (elapsedDays >= UNVERIFIED_ACCOUNT_LIMIT_DAYS) {
+                        Log.d(TAG, "미인증 계정 유효기간 만료: $elapsedDays 일")
+                        return@runTransaction true
+                    } else {
+                        Log.d(TAG, "미인증 계정 유효기간 만료: $elapsedDays 일")
+                        return@runTransaction false
+                    }
+                }.addOnSuccessListener { shouldDelete ->
+                    if (shouldDelete) {
+                        deleteUserAccount(currentUser, uid) {
+                            auth.signOut()
+                            callback?.invoke()
+                        }
+                    } else {
                         auth.signOut()
                         callback?.invoke()
                     }
+                }.addOnFailureListener { e ->
+                    Log.e(TAG, "트랜잭션 실패: ${e.message}")
+                    auth.signOut()
+                    callback?.invoke()
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "미인증 계정 처리 중 오류: ${e.message}")
                 auth.signOut()
@@ -90,28 +98,66 @@ object AccountUtils {
 
     /**
      * 사용자 계정 및 데이터 삭제
-     * Firestore 문서 삭제 후 계정 삭제
+     * Firestore 문서 삭제 후 계정 삭제 - 트랜잭션 방식으로 개선
      */
-    private fun deleteUserAccount(user: FirebaseUser, uid: String, callback: (() -> Unit)?) {
+    private fun deleteUserAccount(user: com.google.firebase.auth.FirebaseUser, uid: String, callback: (() -> Unit)?) {
         val auth = FirebaseAuth.getInstance()
         val db = FirebaseFirestore.getInstance()
+
         try {
-            db.collection("users").document(uid)
-                .delete()
-                .addOnCompleteListener {
-                    if (it.isSuccessful) Log.d(TAG, "사용자 문서 삭제 성공: $uid")
-                    else Log.e(TAG, "문서 삭제 실패: ${it.exception?.message}")
-                    try {
-                        val deleteTask = user.delete()
-                        Tasks.await(deleteTask, DELETION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                        Log.d(TAG, "계정 삭제 성공: ${user.email}")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "계정 삭제 실패: ${e.message}")
-                    } finally {
-                        auth.signOut()
-                        callback?.invoke()
+            db.runTransaction { transaction ->
+                // 1. 사용자가 소유한 모든 박스의 참조 가져오기
+                val userDoc = transaction.get(db.collection("users").document(uid))
+                val boxIds = userDoc.get("boxIds") as? List<String> ?: emptyList()
+
+                // 2. 각 박스에서 사용자 제거
+                for (boxId in boxIds) {
+                    val boxDoc = transaction.get(db.collection("boxes").document(boxId))
+                    val members = boxDoc.get("members") as? Map<String, Any> ?: mapOf()
+                    val sharedUserUids = boxDoc.get("sharedUserUids") as? List<String> ?: emptyList()
+
+                    // 멤버에서 사용자 제거
+                    val updatedMembers = members.toMutableMap()
+                    updatedMembers.remove(uid)
+
+                    // 공유 사용자 목록에서 제거
+                    val updatedSharedUsers = sharedUserUids.filter { it != uid }
+
+                    transaction.update(db.collection("boxes").document(boxId),
+                        mapOf(
+                            "members" to updatedMembers,
+                            "sharedUserUids" to updatedSharedUsers
+                        )
+                    )
+
+                    // 소유자가 삭제되는 경우 처리
+                    if (boxDoc.getString("ownerUid") == uid && updatedMembers.isNotEmpty()) {
+                        val newOwnerUid = updatedMembers.keys.first()
+                        transaction.update(db.collection("boxes").document(boxId), "ownerUid", newOwnerUid)
                     }
                 }
+
+                // 3. 사용자 문서 삭제
+                transaction.delete(db.collection("users").document(uid))
+
+                return@runTransaction true
+            }.addOnSuccessListener {
+                // 4. Firebase 계정 삭제
+                try {
+                    val deleteTask = user.delete()
+                    Tasks.await(deleteTask, DELETION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    Log.d(TAG, "계정 삭제 성공: ${user.email}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "계정 삭제 실패: ${e.message}")
+                } finally {
+                    auth.signOut()
+                    callback?.invoke()
+                }
+            }.addOnFailureListener { e ->
+                Log.e(TAG, "사용자 데이터 삭제 실패: ${e.message}")
+                auth.signOut()
+                callback?.invoke()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "계정 삭제 중 오류: ${e.message}")
             auth.signOut()
@@ -124,35 +170,73 @@ object AccountUtils {
      * 서버단에서 주기적으로 실행할 로직
      */
     fun cleanupOldUnverifiedAccounts(onComplete: ((Int) -> Unit)? = null) {
-        val db = FirebaseFirestore.getInstance()
         try {
+            val db = FirebaseFirestore.getInstance()
             val cutoff = java.util.Calendar.getInstance().apply {
                 add(java.util.Calendar.DAY_OF_YEAR, -UNVERIFIED_ACCOUNT_LIMIT_DAYS.toInt())
             }.time
-            db.collection("users")
+
+            // 미인증 및 오래된 계정 쿼리
+            val userQuery = db.collection("users")
                 .whereEqualTo("emailVerified", false)
                 .whereLessThan("createdAt", cutoff)
-                .get()
-                .addOnSuccessListener { documents ->
-                    var deletedCount = 0
-                    val totalCount = documents.size()
-                    if (totalCount == 0) { onComplete?.invoke(0); return@addOnSuccessListener }
-                    for (doc in documents) {
-                        doc.reference.delete()
-                            .addOnSuccessListener {
-                                deletedCount++
-                                if (deletedCount == totalCount) onComplete?.invoke(deletedCount)
-                            }
-                            .addOnFailureListener {
-                                deletedCount++
-                                if (deletedCount == totalCount) onComplete?.invoke(deletedCount)
-                            }
-                    }
+
+            userQuery.get().addOnSuccessListener { querySnapshot ->
+                val userDocs = querySnapshot.documents
+                if (userDocs.isEmpty()) {
+                    Log.d(TAG, "정리할 미인증 계정이 없습니다")
+                    onComplete?.invoke(0)
+                    return@addOnSuccessListener
                 }
-                .addOnFailureListener {
-                    Log.e(TAG, "일괄 정리 실패: ${it.message}")
+
+                db.runTransaction { transaction ->
+                    // 각 사용자에 대한 처리
+                    for (userDoc in userDocs) {
+                        val uid = userDoc.id
+
+                        // 사용자가 소유한 박스 찾기
+                        val boxIds = userDoc.get("boxIds") as? List<String> ?: emptyList()
+
+                        // 각 박스에서 사용자 제거
+                        for (boxId in boxIds) {
+                            val boxRef = db.collection("boxes").document(boxId)
+                            val boxDoc = transaction.get(boxRef)
+                            if (!boxDoc.exists()) continue
+
+                            // 멤버 및 공유 사용자 목록 업데이트
+                            val members = boxDoc.get("members") as? Map<String, Any> ?: mapOf()
+                            val sharedUserUids = boxDoc.get("sharedUserUids") as? List<String> ?: emptyList()
+
+                            val updatedMembers = members.toMutableMap()
+                            updatedMembers.remove(uid)
+
+                            val updatedSharedUsers = sharedUserUids.filter { it != uid }
+
+                            transaction.update(boxRef,
+                                mapOf(
+                                    "members" to updatedMembers,
+                                    "sharedUserUids" to updatedSharedUsers
+                                )
+                            )
+                        }
+
+                        // 사용자 문서 삭제
+                        transaction.delete(db.collection("users").document(uid))
+                    }
+
+                    // 트랜잭션 결과 반환
+                    return@runTransaction userDocs.size
+                }.addOnSuccessListener { count ->
+                    Log.d(TAG, "$(count)개의 미인증 계정 정리 완료")
+                    onComplete?.invoke(count)
+                }.addOnFailureListener { e ->
+                    Log.e(TAG, "일괄 정리 실패: ${e.message}")
                     onComplete?.invoke(0)
                 }
+            }.addOnFailureListener { e ->
+                Log.e(TAG, "오래된 계정 쿼리 오류: ${e.message}")
+                onComplete?.invoke(0)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "오래된 계정 정리 오류: ${e.message}")
             onComplete?.invoke(0)
@@ -177,54 +261,6 @@ object AccountUtils {
             callback?.invoke()
         }
     }
-
-    /**
-     * 현재 사용자 가입 상태 확인
-     * 로그인되지 않음 / 이메일 인증 완료 / 비밀번호 설정 완료 상태로 분류
-     */
-    fun checkSignupState(callback: (SignupState) -> Unit) {
-        val auth = FirebaseAuth.getInstance()
-        val user = auth.currentUser
-        if (user == null) {
-            callback(SignupState.NOT_LOGGED_IN)
-            return
-        }
-        if (!user.isEmailVerified) {
-            deleteTempAccountAndSignOut { callback(SignupState.NOT_LOGGED_IN) }
-            return
-        }
-        val db = FirebaseFirestore.getInstance()
-        db.collection("users").document(user.uid)
-            .get()
-            .addOnSuccessListener { doc ->
-                val emailVerified = doc?.getBoolean("emailVerified") ?: false
-                val passwordSet = doc?.getBoolean("passwordSet") ?: false
-                when {
-                    emailVerified && passwordSet -> callback(SignupState.COMPLETED)
-                    emailVerified -> callback(SignupState.EMAIL_VERIFIED)
-                    else -> db.collection("users").document(user.uid)
-                        .update("emailVerified", true)
-                        .addOnSuccessListener { callback(SignupState.EMAIL_VERIFIED) }
-                        .addOnFailureListener {
-                            auth.signOut()
-                            callback(SignupState.NOT_LOGGED_IN)
-                        }
-                }
-            }
-            .addOnFailureListener {
-                Log.e(TAG, "사용자 정보 조회 실패: ${it.message}")
-                auth.signOut()
-                callback(SignupState.NOT_LOGGED_IN)
-            }
-    }
-
-    /**
-     * 예외 처리 결과를 담는 데이터 클래스
-     */
-    data class ExceptionResult(
-        val state: SignupState,
-        val email: String? = null
-    )
 
     /**
      * 예외 상황(가입 흐름) 확인 후 callback으로 결과 전달
@@ -277,12 +313,8 @@ object AccountUtils {
     /**
      * 회원가입 상태 저장
      */
-    fun saveSignupState(state: SignupState, email: String?, password: String? = null) {
+    fun saveSignupState(state: SignupState, email: String?, tempPassword: String? = null) {
         try {
-            signupState = state
-            signupEmail = email
-            tempPassword = password
-
             Log.d(TAG, "회원가입 상태 저장: $state, 이메일: $email")
 
             val context = MyApplication.getAppContext()
@@ -310,57 +342,10 @@ object AccountUtils {
 
             val state = stateStr?.let { runCatching { SignupState.valueOf(it) }.getOrNull() } ?: SignupState.NOT_LOGGED_IN
 
-            signupState = state
-            signupEmail = email
-
             return Triple(state, email, null)
         } catch (e: Exception) {
             Log.e(TAG, "상태 복원 중 오류: ${e.message}", e)
             return Triple(SignupState.NOT_LOGGED_IN, null, null)
-        }
-    }
-
-    /**
-     * 기존 restoreSignupState(callback) 메소드도 그대로 유지
-     */
-    fun restoreSignupState(callback: (SignupState, String?, String?) -> Unit) {
-        val auth = FirebaseAuth.getInstance()
-        val currentUser = auth.currentUser
-
-        if (currentUser == null) {
-            callback(SignupState.NOT_LOGGED_IN, null, null)
-            return
-        }
-
-        if (signupEmail != null) {
-            callback(signupState, signupEmail, tempPassword)
-            return
-        }
-
-        currentUser.reload().addOnCompleteListener {
-            val user = auth.currentUser
-            if (user == null) {
-                callback(SignupState.NOT_LOGGED_IN, null, null)
-                return@addOnCompleteListener
-            }
-
-            if (!user.isEmailVerified) {
-                callback(SignupState.NOT_LOGGED_IN, user.email, null)
-                return@addOnCompleteListener
-            }
-
-            FirebaseFirestore.getInstance()
-                .collection("users")
-                .document(user.uid)
-                .get()
-                .addOnSuccessListener { doc ->
-                    val passwordSet = doc.getBoolean("passwordSet") ?: false
-                    val state = if (passwordSet) SignupState.COMPLETED else SignupState.EMAIL_VERIFIED
-                    callback(state, user.email, null)
-                }
-                .addOnFailureListener {
-                    callback(SignupState.NOT_LOGGED_IN, null, null)
-                }
         }
     }
 
@@ -454,34 +439,12 @@ object AccountUtils {
     }
 
     /**
-     * 인증 완료 후 다음 단계로 이동
+     * 안전한 토큰 생성
      */
-    fun handleVerificationComplete(
-        email: String,
-        tempPassword: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        val auth = FirebaseAuth.getInstance()
-        val db = FirebaseFirestore.getInstance()
-
-        auth.signInWithEmailAndPassword(email, tempPassword)
-            .addOnSuccessListener {
-                val uid = auth.currentUser?.uid ?: return@addOnSuccessListener
-                db.collection("users").document(uid)
-                    .update("emailVerified", true)
-                    .addOnSuccessListener { onSuccess() }
-                    .addOnFailureListener { e -> onError("상태 업데이트 실패: ${e.message}") }
-            }
-            .addOnFailureListener { e -> onError("로그인 실패: ${e.message}") }
-    }
-
-    /**
-     * 가입 상태를 나타내는 enum
-     */
-    enum class SignupState {
-        NOT_LOGGED_IN,
-        EMAIL_VERIFIED,
-        COMPLETED
+    fun generateSecureToken(length: Int = 16): String {
+        val random = SecureRandom()
+        val bytes = ByteArray(length)
+        random.nextBytes(bytes)
+        return android.util.Base64.encodeToString(bytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
     }
 }

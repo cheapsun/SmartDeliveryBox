@@ -1,4 +1,4 @@
-package com.example.deliverybox
+package com.example.deliverybox.auth
 
 import android.content.Context
 import android.content.Intent
@@ -13,29 +13,27 @@ import android.view.View
 import android.widget.Toast
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.example.deliverybox.databinding.ActivityLoginBinding
-import com.example.deliverybox.utils.FirestoreHelper
+import com.example.deliverybox.repository.FirebaseAuthRepository
 import com.example.deliverybox.utils.SharedPrefsHelper
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseAuthInvalidUserException
-import com.google.firebase.FirebaseNetworkException
-import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.launch
+import com.example.deliverybox.R
+import com.example.deliverybox.home.MainActivity
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
-    private lateinit var auth: FirebaseAuth
+    private val authRepository = FirebaseAuthRepository()
+    private val TAG = "LoginActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        auth = FirebaseAuth.getInstance()
-
         // 자동 로그인 확인
-        if (SharedPrefsHelper.isAutoLoginEnabled(this) && auth.currentUser != null) {
+        if (SharedPrefsHelper.isAutoLoginEnabled(this) && authRepository.getCurrentUser() != null) {
             navigateToMain()
             return
         }
@@ -103,58 +101,44 @@ class LoginActivity : AppCompatActivity() {
             Toast.makeText(this, "인터넷 연결을 확인해주세요", Toast.LENGTH_SHORT).show()
             return
         }
+
         binding.progressLogin.visibility = View.VISIBLE
         binding.btnLogin.isEnabled = false
 
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnSuccessListener { result ->
-                val user = result.user
-                if (user != null && !user.isEmailVerified) {
-                    binding.progressLogin.visibility = View.GONE
-                    binding.btnLogin.isEnabled = true
-                    showEmailVerificationPrompt(email)
-                    return@addOnSuccessListener
-                }
-                val uid = user?.uid ?: return@addOnSuccessListener
-                onLoginSuccess(uid)
-            }
-            .addOnFailureListener { e ->
+        lifecycleScope.launch {
+            try {
+                val result = authRepository.login(email, password)
+
+                result.fold(
+                    onSuccess = { userData ->
+                        binding.progressLogin.visibility = View.GONE
+                        // 자동 로그인 활성화
+                        SharedPrefsHelper.setAutoLogin(this@LoginActivity, true)
+                        // 마지막 로그인 시간 저장
+                        SharedPrefsHelper.setLastLoginTime(this@LoginActivity, System.currentTimeMillis())
+
+                        Toast.makeText(this@LoginActivity, "로그인 성공!", Toast.LENGTH_SHORT).show()
+                        navigateToMain()
+                    },
+                    onFailure = { exception ->
+                        binding.progressLogin.visibility = View.GONE
+                        binding.btnLogin.isEnabled = true
+
+                        val errorMessage = exception.message ?: "로그인 실패"
+                        Toast.makeText(this@LoginActivity, errorMessage, Toast.LENGTH_SHORT).show()
+
+                        // 이메일 인증 에러인 경우 처리
+                        if (errorMessage.contains("이메일 인증")) {
+                            showEmailVerificationPrompt(email)
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "로그인 처리 중 예외 발생: ${e.message}", e)
                 binding.progressLogin.visibility = View.GONE
                 binding.btnLogin.isEnabled = true
-                val errorMessage = when (e) {
-                    is FirebaseAuthInvalidUserException -> "존재하지 않는 계정입니다"
-                    is FirebaseAuthInvalidCredentialsException -> "이메일 또는 비밀번호가 일치하지 않습니다"
-                    is FirebaseNetworkException -> "네트워크 오류가 발생했습니다"
-                    else -> "로그인 실패: ${e.message}"
-                }
-                Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@LoginActivity, "로그인 처리 중 오류가 발생했습니다", Toast.LENGTH_SHORT).show()
             }
-    }
-
-    // 로그인 성공 후 처리 메서드
-    private fun onLoginSuccess(uid: String) {
-        try {
-            // FCM 토큰 업데이트
-            updateFcmToken(uid)
-            // 자동 로그인 활성화
-            SharedPrefsHelper.setAutoLogin(this, true)
-            // 마지막 로그인 시간 저장
-            SharedPrefsHelper.setLastLoginTime(this, System.currentTimeMillis())
-
-            FirestoreHelper.getUserData(uid) { userData ->
-                binding.progressLogin.visibility = View.GONE
-                if (userData != null) {
-                    Toast.makeText(this, "로그인 성공!", Toast.LENGTH_SHORT).show()
-                    navigateToMain()
-                } else {
-                    binding.btnLogin.isEnabled = true
-                    Toast.makeText(this, "사용자 정보 불러오기 실패", Toast.LENGTH_SHORT).show()
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("LoginActivity", "로그인 성공 처리 중 오류: ${e.message}")
-            binding.progressLogin.visibility = View.GONE
-            binding.btnLogin.isEnabled = true
         }
     }
 
@@ -179,12 +163,6 @@ class LoginActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun updateFcmToken(uid: String) {
-        FirebaseMessaging.getInstance().token
-            .addOnSuccessListener { token -> FirestoreHelper.updateFcmToken(uid, token) }
-            .addOnFailureListener { e -> Log.e("LoginActivity", "FCM 토큰 가져오기 실패: ${e.message}") }
-    }
-
     private fun setSignupText() {
         val fullText = "계정이 없으신가요? 가입하기"
         val spannableString = SpannableString(fullText)
@@ -202,11 +180,16 @@ class LoginActivity : AppCompatActivity() {
         val builder = androidx.appcompat.app.AlertDialog.Builder(this)
         val view = layoutInflater.inflate(R.layout.dialog_forgot_password, null)
         val etEmail = view.findViewById<android.widget.EditText>(R.id.et_dialog_email)
+
         builder.setView(view)
             .setTitle("비밀번호 재설정")
             .setPositiveButton("전송") { dialog, _ ->
                 val email = etEmail.text.toString().trim()
-                if (email.isNotEmpty()) sendPasswordResetEmail(email) else Toast.makeText(this, "이메일을 입력해주세요", Toast.LENGTH_SHORT).show()
+                if (email.isNotEmpty()) {
+                    sendPasswordResetEmail(email)
+                } else {
+                    Toast.makeText(this, "이메일을 입력해주세요", Toast.LENGTH_SHORT).show()
+                }
                 dialog.dismiss()
             }
             .setNegativeButton("취소", null)
@@ -214,9 +197,36 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun sendPasswordResetEmail(email: String) {
-        auth.sendPasswordResetEmail(email)
-            .addOnSuccessListener { Toast.makeText(this, "비밀번호 재설정 이메일이 전송되었습니다", Toast.LENGTH_SHORT).show() }
-            .addOnFailureListener { e -> Toast.makeText(this, "이메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show() }
+        if (email.isEmpty()) {
+            Toast.makeText(this, "이메일을 입력해주세요", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // 진행 상태 표시
+        val progressDialog = android.app.ProgressDialog(this).apply {
+            setMessage("비밀번호 재설정 이메일을 전송 중입니다...")
+            setCancelable(false)
+            show()
+        }
+
+        lifecycleScope.launch {
+            try {
+                val result = authRepository.sendPasswordResetEmail(email)
+                progressDialog.dismiss()
+
+                result.fold(
+                    onSuccess = {
+                        Toast.makeText(this@LoginActivity, "비밀번호 재설정 이메일이 전송되었습니다", Toast.LENGTH_SHORT).show()
+                    },
+                    onFailure = { e ->
+                        Toast.makeText(this@LoginActivity, "이메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            } catch (e: Exception) {
+                progressDialog.dismiss()
+                Toast.makeText(this@LoginActivity, "이메일 전송 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun isNetworkAvailable(): Boolean {

@@ -13,6 +13,10 @@ import com.example.deliverybox.utils.SharedPrefsHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.appcompat.app.AppCompatActivity
+import com.example.deliverybox.auth.EmailVerificationActivity
+import com.example.deliverybox.auth.LoginActivity
+import com.example.deliverybox.auth.SignupPasswordActivity
+import com.example.deliverybox.home.MainActivity
 
 class SplashActivity : AppCompatActivity() {
 

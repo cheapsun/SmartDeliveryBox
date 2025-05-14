@@ -29,7 +29,7 @@ android {
         }
     }
 
-    // ✅ Kotlin DSL용 viewBinding 설정 방법
+    //Kotlin DSL용 viewBinding 설정 방법
     buildFeatures {
         viewBinding = true
     }
@@ -62,8 +62,11 @@ dependencies {
     // ZXing 라이브러리(qr코드)
     implementation("com.google.zxing:core:3.5.2")
 
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-
+    // material
     implementation("com.google.android.material:material:1.11.0")
 
     implementation(platform("com.google.firebase:firebase-bom:32.8.0"))

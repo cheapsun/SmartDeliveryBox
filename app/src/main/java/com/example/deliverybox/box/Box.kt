@@ -1,4 +1,4 @@
-package com.example.deliverybox.model
+package com.example.deliverybox.box
 
 data class Box(
     val boxId: String = "",

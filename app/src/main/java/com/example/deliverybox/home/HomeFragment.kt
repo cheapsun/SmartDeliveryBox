@@ -1,4 +1,4 @@
-package com.example.deliverybox
+package com.example.deliverybox.home
 
 import android.content.Intent
 import android.os.Bundle
@@ -11,8 +11,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import adapter.BoxListAdapter
+import com.example.deliverybox.box.BoxDetailActivity
 import com.example.deliverybox.databinding.FragmentHomeBinding
-import com.example.deliverybox.model.BoxInfo
+import com.example.deliverybox.box.BoxInfo
+import com.example.deliverybox.box.RegisterBoxActivity
 import com.example.deliverybox.dialog.RegisterBoxMethodDialogFragment
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore

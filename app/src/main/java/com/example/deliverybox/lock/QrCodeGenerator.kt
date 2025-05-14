@@ -1,4 +1,4 @@
-package com.example.deliverybox.utils
+package com.example.deliverybox.lock
 
 import android.graphics.Bitmap
 import android.graphics.Color

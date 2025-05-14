@@ -1,9 +1,9 @@
 package com.example.deliverybox.utils
 
 import android.util.Log
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.android.gms.tasks.Tasks
+import utils.FirestoreHelper
 import java.util.concurrent.TimeUnit
 
 /**
