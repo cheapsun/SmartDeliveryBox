@@ -76,10 +76,14 @@ class RegisterBoxActivity : AppCompatActivity() {
                 SetOptions.merge()
             )
 
-            // 사용자 문서 갱신
+            // 사용자 문서 갱신 (기존 alias 유지 + 새 alias 추가)
             val userRef = db.collection("users").document(uid)
-            val userData = mutableMapOf<String, Any>("mainBoxId" to boxId)
-            if (alias.isNotEmpty()) userData["boxAliases.$boxId"] = alias
+            val userData = mutableMapOf<String, Any>(
+                "mainBoxId" to boxId
+            )
+            if (alias.isNotEmpty()) {
+                userData["boxAliases.$boxId"] = alias
+            }
             tx.set(userRef, userData, SetOptions.merge())
 
             boxId
@@ -113,16 +117,13 @@ class RegisterBoxActivity : AppCompatActivity() {
             )
         )
 
-        // 사용자 문서 갱신
+        // 사용자 문서 갱신 (기존 alias 유지 + 새 alias 추가)
         val userRef = db.collection("users").document(uid)
-        batch.set(
-            userRef,
-            mapOf(
-                "mainBoxId" to boxId,
-                "boxAliases" to mapOf(boxId to alias)
-            ),
-            SetOptions.merge()
+        val updateData = mapOf(
+            "mainBoxId" to boxId,
+            "boxAliases.$boxId" to alias
         )
+        batch.set(userRef, updateData, SetOptions.merge())
 
         batch.commit()
             .addOnSuccessListener {

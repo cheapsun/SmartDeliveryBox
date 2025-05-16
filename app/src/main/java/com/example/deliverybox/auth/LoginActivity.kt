@@ -50,7 +50,7 @@ class LoginActivity : AppCompatActivity() {
                 val password = binding.etPassword.text.toString().trim()
                 binding.btnLogin.isEnabled = email.isNotEmpty() && password.isNotEmpty()
                 binding.btnLogin.setBackgroundColor(
-                    if (binding.btnLogin.isEnabled) Color.parseColor("#6A8DFF   ")
+                    if (binding.btnLogin.isEnabled) Color.parseColor("#6A8DFF")
                     else Color.parseColor("#AABEFF")
                 )
             }

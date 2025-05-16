@@ -183,6 +183,12 @@ object FirestoreHelper {
             val boxIds = document.get("boxIds") as? List<String> ?: emptyList()
             val isPasswordSet = document.getBoolean("passwordSet") ?: false
 
+            // boxAliases 추가
+            val boxAliases = document.get("boxAliases") as? Map<String, String> ?: emptyMap()
+
+            // mainBoxId 추가
+            val mainBoxId = document.getString("mainBoxId") ?: ""
+
             // 로그인 시간 업데이트 (백그라운드)
             db.collection("users").document(uid)
                 .update("lastLoginAt", FieldValue.serverTimestamp())
@@ -190,7 +196,17 @@ object FirestoreHelper {
                     Log.w(TAG, "로그인 시간 업데이트 실패: $uid, 오류: ${e.message}")
                 }
 
-            callback(UserData(uid, email, displayName, photoUrl, boxIds, isPasswordSet))
+            // 수정된 UserData 객체 생성 (모든 인자 전달 또는 명명된 매개변수 사용)
+            callback(UserData(
+                uid = uid,
+                email = email,
+                displayName = displayName,
+                photoUrl = photoUrl,
+                boxIds = boxIds,
+                boxAliases = boxAliases,
+                mainBoxId = mainBoxId,
+                isPasswordSet = isPasswordSet
+            ))
         } catch (e: Exception) {
             Log.e(TAG, "사용자 데이터 파싱 실패: $uid, 오류: ${e.message}")
             callback(null)

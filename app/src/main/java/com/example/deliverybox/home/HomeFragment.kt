@@ -27,6 +27,7 @@ class HomeFragment : Fragment() {
 
     private lateinit var adapter: BoxListAdapter
     private val boxList = mutableListOf<BoxInfo>()
+    private var mainBoxId: String = ""
 
     private val auth by lazy { FirebaseAuth.getInstance() }
     private val db by lazy { FirebaseFirestore.getInstance() }
@@ -112,17 +113,25 @@ class HomeFragment : Fragment() {
                 Log.d("HomeFragment", "사용자 문서 데이터: ${snapshot.data}")
                 boxList.clear()
 
-                val boxAliases = snapshot.get("boxAliases") as? Map<String, String>
+                // boxAliases 맵 가져오기 (key: boxId, value: alias)
+                val boxAliases = snapshot.get("boxAliases") as? Map<String, String> ?: emptyMap()
                 val mainBoxId = snapshot.getString("mainBoxId")
 
-                if (boxAliases.isNullOrEmpty() && mainBoxId.isNullOrEmpty()) {
+                if (boxAliases.isEmpty() && mainBoxId.isNullOrEmpty()) {
                     Log.w("HomeFragment", "boxAliases와 mainBoxId 모두 없음")
                     updateEmptyState(true)
                     return@addSnapshotListener
                 }
 
+                // 모든 박스를 처리할 맵 생성
                 val boxesToProcess = mutableMapOf<String, String>()
-                boxAliases?.let { boxesToProcess.putAll(it) }
+
+                // 모든 알려진 박스 별칭 추가
+                boxAliases.forEach { (boxId, alias) ->
+                    boxesToProcess[boxId] = alias
+                }
+
+                // mainBoxId가 있지만 boxAliases에 없는 경우 추가
                 if (!mainBoxId.isNullOrEmpty() && !boxesToProcess.containsKey(mainBoxId)) {
                     boxesToProcess[mainBoxId] = "내 택배함"
                 }
@@ -133,8 +142,10 @@ class HomeFragment : Fragment() {
                     return@addSnapshotListener
                 }
 
+                val totalBoxCount = boxesToProcess.size
                 var processedCount = 0
 
+                // 각 택배함 정보 로드 및 표시
                 for ((boxId, alias) in boxesToProcess) {
                     val currentBoxId = boxId
                     val currentAlias = alias
@@ -159,10 +170,16 @@ class HomeFragment : Fragment() {
                                 doorLocked = true
                             )
 
+                            // boxList에 추가하고 UI 갱신
                             boxList.add(boxInfo)
-                            adapter.notifyDataSetChanged()
-                            updateEmptyState(boxList.isEmpty())
 
+                            // 모든 박스 처리가 완료되면 정렬 진행
+                            processedCount++
+                            if (processedCount >= totalBoxCount) {
+                                sortBoxList()
+                            }
+
+                            // 택배 수 정보 로드
                             db.collection("boxes").document(currentBoxId)
                                 .collection("packages")
                                 .whereEqualTo("isDelivered", false)
@@ -189,6 +206,19 @@ class HomeFragment : Fragment() {
                         }
                 }
             }
+    }
+
+    // 정렬 로직을 별도 함수로 분리
+    private fun sortBoxList() {
+        // 메인 박스를 최상단에 배치
+        boxList.sortWith(compareBy {
+            it.boxId != mainBoxId  // mainBoxId가 false(0)로 평가되어 상단에 배치
+        })
+
+        // 어댑터 업데이트
+        adapter.updateMainBoxId(mainBoxId)
+        adapter.notifyDataSetChanged()
+        updateEmptyState(boxList.isEmpty())
     }
 
     private fun updateEmptyState(isEmpty: Boolean = boxList.isEmpty()) {

@@ -25,6 +25,7 @@ class BoxDetailActivity : AppCompatActivity() {
     private lateinit var boxId: String
     private lateinit var boxName: String
     private lateinit var boxAlias: String
+    private var isMainBox: Boolean = false
 
     private val auth by lazy { FirebaseAuth.getInstance() }
     private val db by lazy { FirebaseFirestore.getInstance() }
@@ -61,6 +62,22 @@ class BoxDetailActivity : AppCompatActivity() {
         setupListeners()
         setupRecyclerViews()
         loadData()
+        checkIfMainBox()
+    }
+
+    // 메인 박스 여부 확인 메서드 추가
+    private fun checkIfMainBox() {
+        val uid = auth.currentUser?.uid ?: return
+
+        db.collection("users").document(uid)
+            .get()
+            .addOnSuccessListener { userDoc ->
+                val mainBoxId = userDoc.getString("mainBoxId") ?: ""
+                isMainBox = mainBoxId == boxId
+
+                // 체크박스 상태 업데이트
+                binding.switchMainBox.isChecked = isMainBox
+            }
     }
 
     private fun setupUI() {
@@ -104,6 +121,40 @@ class BoxDetailActivity : AppCompatActivity() {
             }
             startActivity(intent)
         }
+
+        // 메인 박스 설정 스위치 리스너
+        binding.switchMainBox.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked != isMainBox) {  // 상태가 변경된 경우에만 처리
+                setAsMainBox(isChecked)
+            }
+        }
+    }
+
+    private fun setAsMainBox(setAsMain: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+
+        // 메인 박스로 설정 또는 해제
+        val updateData = if (setAsMain) {
+            mapOf("mainBoxId" to boxId)
+        } else {
+            mapOf("mainBoxId" to "")  // 메인 박스 해제시 빈 문자열로 설정
+        }
+
+        db.collection("users").document(uid)
+            .update(updateData)
+            .addOnSuccessListener {
+                isMainBox = setAsMain
+                Toast.makeText(
+                    this,
+                    if (setAsMain) "메인 택배함으로 설정되었습니다" else "메인 택배함 설정이 해제되었습니다",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            .addOnFailureListener { e ->
+                // 실패시 체크박스 상태 되돌리기
+                binding.switchMainBox.isChecked = isMainBox
+                Toast.makeText(this, "설정 변경 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun setupRecyclerViews() {
