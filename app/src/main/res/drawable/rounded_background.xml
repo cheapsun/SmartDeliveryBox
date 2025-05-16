@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#6A8DFF" /> <!-- 🔵 반드시 이 색 -->
-    <corners android:radius="12dp" /> <!-- 🔵 부드러운 모서리 -->
+    <solid android:color="#6A8DFF" />
+    <corners android:radius="8dp" />
 </shape>

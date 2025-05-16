@@ -141,8 +141,8 @@ class SignupPasswordActivity : AppCompatActivity() {
     }
 
     private fun validatePasswordAndUpdateUI() {
-        val pw = etPassword.text.toString()
-        val confirm = etConfirmPassword.text.toString()
+        val pw = binding.etPassword.text.toString()
+        val confirm = binding.etConfirmPassword.text.toString()
 
         // 강도 평가 및 UI 업데이트
         val strength = PasswordStrengthEvaluator.evaluate(pw)
@@ -156,22 +156,23 @@ class SignupPasswordActivity : AppCompatActivity() {
         btnConfirm.isEnabled = enabled
         btnConfirm.backgroundTintList =
             android.content.res.ColorStateList.valueOf(
-                if (enabled) Color.parseColor("#448AFF")
+                if (enabled) Color.parseColor("#6A8DFF")
                 else Color.parseColor("#AABEFF")
             )
 
+        // 비밀번호 일치 여부 확인
         if (confirm.isNotEmpty() && !isMatch) {
-            etConfirmPassword.error = "비밀번호가 일치하지 않습니다"
+            binding.etConfirmPassword.error = "비밀번호가 일치하지 않습니다"
         } else {
-            etConfirmPassword.error = null
+            binding.etConfirmPassword.error = null
         }
     }
 
     private fun updateStrengthUI(str: com.example.deliverybox.utils.PasswordStrength) {
         val gray = Color.parseColor("#E0E0E0")
-        segWeak.setBackgroundColor(gray)
-        segMedium.setBackgroundColor(gray)
-        segStrong.setBackgroundColor(gray)
+        binding.segWeak.setBackgroundColor(gray)
+        binding.segMedium.setBackgroundColor(gray)
+        binding.segStrong.setBackgroundColor(gray)
 
         when (str) {
             com.example.deliverybox.utils.PasswordStrength.WEAK -> segWeak.setBackgroundColor(str.color)

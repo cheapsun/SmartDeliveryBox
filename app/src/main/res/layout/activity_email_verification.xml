@@ -26,6 +26,7 @@
         android:text="이메일 인증"
         android:textSize="24sp"
         android:textStyle="bold"
+        android:textColor="@color/text_primary"
         android:layout_marginTop="32dp"
         app:layout_constraintTop_toBottomOf="@id/ib_back"
         app:layout_constraintStart_toStartOf="parent" />
@@ -36,7 +37,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text=""
-        android:textColor="#000000"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
         android:textSize="18sp"
         android:layout_marginTop="16dp"
         app:layout_constraintTop_toBottomOf="@id/tv_title"
@@ -48,7 +50,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="이메일로 인증 링크를 보냈습니다. 메일함을 확인하여 링크를 클릭한 후 아래 버튼을 눌러주세요."
-        android:textColor="#666666"
+        android:textColor="@color/text_secondary"
         android:layout_marginTop="16dp"
         app:layout_constraintTop_toBottomOf="@id/tv_email"
         app:layout_constraintStart_toStartOf="parent" />
@@ -59,9 +61,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="남은 시간: 05:00"
-        android:textSize="14sp"
+        android:textSize="16sp"
+        android:textStyle="bold"
         android:textColor="#666666"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="24dp"
         app:layout_constraintTop_toBottomOf="@id/tv_info"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -72,8 +75,8 @@
         android:layout_height="wrap_content"
         android:text="인증 확인"
         android:textColor="@android:color/white"
-        android:backgroundTint="#448AFF"
-        android:layout_marginTop="24dp"
+        android:backgroundTint="@color/primary_blue"
+        android:layout_marginTop="32dp"
         app:layout_constraintTop_toBottomOf="@id/tv_timer"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />

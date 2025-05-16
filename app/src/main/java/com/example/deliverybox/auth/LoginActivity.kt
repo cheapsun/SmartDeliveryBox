@@ -50,7 +50,7 @@ class LoginActivity : AppCompatActivity() {
                 val password = binding.etPassword.text.toString().trim()
                 binding.btnLogin.isEnabled = email.isNotEmpty() && password.isNotEmpty()
                 binding.btnLogin.setBackgroundColor(
-                    if (binding.btnLogin.isEnabled) Color.parseColor("#448AFF")
+                    if (binding.btnLogin.isEnabled) Color.parseColor("#6A8DFF   ")
                     else Color.parseColor("#AABEFF")
                 )
             }
@@ -180,6 +180,8 @@ class LoginActivity : AppCompatActivity() {
         val builder = androidx.appcompat.app.AlertDialog.Builder(this)
         val view = layoutInflater.inflate(R.layout.dialog_forgot_password, null)
         val etEmail = view.findViewById<android.widget.EditText>(R.id.et_dialog_email)
+
+        etEmail.setText(binding.etEmail.text.toString())
 
         builder.setView(view)
             .setTitle("비밀번호 재설정")

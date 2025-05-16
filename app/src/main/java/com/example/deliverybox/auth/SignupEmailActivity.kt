@@ -1,5 +1,6 @@
 package com.example.deliverybox.auth
 
+import android.content.res.ColorStateList
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -89,24 +90,27 @@ class SignupEmailActivity : AppCompatActivity() {
      * 이메일 형식이 유효하고 약관에 동의한 경우에만 다음 버튼 활성화
      */
     private fun validateEmailAndUpdateUI() {
-        val email = etEmail.text.toString().trim()
+        val email = binding.etEmail.text.toString().trim()
         val isEmailValid = Patterns.EMAIL_ADDRESS.matcher(email).matches()
-        val isEnabled = isEmailValid && checkBoxTerms.isChecked && !isCheckingEmail
+        val isEnabled = isEmailValid && binding.checkboxTerms.isChecked && !isCheckingEmail
 
-        btnNext.isEnabled = isEnabled
+        // 버튼 상태 업데이트
+        binding.btnNextStep.isEnabled = isEnabled
         if (isEnabled) {
             // 입력이 맞을 때 → 진한 파란색
-            btnNext.setBackgroundColor(Color.parseColor("#448AFF"))
+            binding.btnNextStep.backgroundTintList =
+                ColorStateList.valueOf(Color.parseColor("#6A8DFF"))
         } else {
             // 입력이 안 맞을 때 → 연하늘색
-            btnNext.setBackgroundColor(Color.parseColor("#AABEFF"))
+            binding.btnNextStep.backgroundTintList =
+                ColorStateList.valueOf(Color.parseColor("#AABEFF"))
         }
 
-        // 이메일 형식이 맞지 않으면 오류 표시
+        // 이메일 형식 에러 표시
         if (email.isNotEmpty() && !isEmailValid) {
-            etEmail.error = "올바른 이메일 형식이 아닙니다"
+            binding.layoutEmail.error = "올바른 이메일 형식이 아닙니다"
         } else {
-            etEmail.error = null
+            binding.layoutEmail.error = null
         }
     }
 
@@ -160,9 +164,11 @@ class SignupEmailActivity : AppCompatActivity() {
      * 이용약관 다이얼로그 표시
      */
     private fun showTermsDialog() {
+        val termsText = getString(R.string.terms_of_service)
+
         AlertDialog.Builder(this)
             .setTitle("이용약관 및 개인정보 처리방침")
-            .setMessage(getString(R.string.terms_of_service))
+            .setMessage(termsText)
             .setPositiveButton("확인") { dialog, _ ->
                 dialog.dismiss()
             }

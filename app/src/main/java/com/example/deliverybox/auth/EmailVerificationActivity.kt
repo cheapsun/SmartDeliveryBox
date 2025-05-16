@@ -1,6 +1,8 @@
 package com.example.deliverybox.auth
 
 import android.content.Intent
+import android.graphics.Color
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.view.View
@@ -105,22 +107,30 @@ class EmailVerificationActivity : AppCompatActivity() {
         }
     }
 
+    // 이메일 인증 확인
     private fun checkEmailVerification() {
         binding.progressVerifying.visibility = View.VISIBLE
+        binding.btnVerify.isEnabled = false
 
         lifecycleScope.launch {
             try {
-                val tokenToUse = token ?: ""
-                val result = authRepository.verifyEmail(tokenToUse, email)
+                val tokenToVerify = token ?: ""
+
+                val result = authRepository.verifyEmail(tokenToVerify, email)
+
+                binding.progressVerifying.visibility = View.GONE
+                binding.btnVerify.isEnabled = true
 
                 result.fold(
                     onSuccess = { verified ->
-                        binding.progressVerifying.visibility = View.GONE
                         if (verified) {
-                            AccountUtils.saveSignupState(AccountUtils.SignupState.EMAIL_VERIFIED, email)
+                            // 인증 성공 시 처리
+                            Toast.makeText(this@EmailVerificationActivity,
+                                "이메일 인증이 완료되었습니다!", Toast.LENGTH_SHORT).show()
 
                             // 비밀번호 설정 화면으로 이동
-                            val intent = Intent(this@EmailVerificationActivity, SignupPasswordActivity::class.java).apply {
+                            val intent = Intent(this@EmailVerificationActivity,
+                                SignupPasswordActivity::class.java).apply {
                                 putExtra("email", email)
                                 putExtra("fromVerification", true)
                                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -128,27 +138,35 @@ class EmailVerificationActivity : AppCompatActivity() {
                             startActivity(intent)
                             finish()
                         } else {
-                            Toast.makeText(this@EmailVerificationActivity, "이메일 인증에 실패했습니다", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@EmailVerificationActivity,
+                                "이메일 인증에 실패했습니다. 다시 시도해주세요.",
+                                Toast.LENGTH_SHORT).show()
                         }
                     },
                     onFailure = { e ->
-                        binding.progressVerifying.visibility = View.GONE
-                        // 이메일 미인증 상태일 경우 친절하게 안내
+                        // 인증 실패 시 친절한 안내
                         if (e.message?.contains("이메일 인증이 완료되지 않았습니다") == true) {
-                            Toast.makeText(this@EmailVerificationActivity, "아직 이메일 인증이 완료되지 않았습니다", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@EmailVerificationActivity,
+                                "아직 이메일 인증이 완료되지 않았습니다. 메일함을 확인해주세요.",
+                                Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(this@EmailVerificationActivity, "오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@EmailVerificationActivity,
+                                "인증 확인 중 오류가 발생했습니다: ${e.message}",
+                                Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
             } catch (e: Exception) {
                 binding.progressVerifying.visibility = View.GONE
-                Toast.makeText(this@EmailVerificationActivity, "오류가 발생했습니다: ${e.message}", Toast.LENGTH_SHORT).show()
-                Log.e(TAG, "인증 확인 중 오류: ${e.message}", e)
+                binding.btnVerify.isEnabled = true
+                Toast.makeText(this@EmailVerificationActivity,
+                    "인증 확인 중 오류가 발생했습니다: ${e.message}",
+                    Toast.LENGTH_SHORT).show()
             }
         }
     }
 
+    // 타이머 시작
     private fun startCountdownTimer() {
         countDownTimer?.cancel()
         if (timeRemaining <= 0) timeRemaining = VERIFICATION_TIMEOUT
@@ -159,11 +177,22 @@ class EmailVerificationActivity : AppCompatActivity() {
                 val minutes = millisUntilFinished / 1000 / 60
                 val seconds = millisUntilFinished / 1000 % 60
                 binding.tvTimer.text = String.format("남은 시간: %02d:%02d", minutes, seconds)
+
+                // 15초 이하로 남으면 빨간색으로 표시
+                if (millisUntilFinished <= 15000) {
+                    binding.tvTimer.setTextColor(Color.RED)
+                } else {
+                    binding.tvTimer.setTextColor(Color.parseColor("#666666"))
+                }
             }
 
             override fun onFinish() {
                 binding.tvTimer.text = "제한 시간이 만료되었습니다"
+                binding.tvTimer.setTextColor(Color.RED)
                 binding.btnSendCode.isEnabled = true
+                binding.btnSendCode.backgroundTintList =
+                    ColorStateList.valueOf(Color.parseColor("#6A8DFF"))
+                binding.btnSendCode.setTextColor(Color.WHITE)
             }
         }.start()
     }

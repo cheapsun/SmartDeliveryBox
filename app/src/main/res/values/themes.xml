@@ -4,13 +4,22 @@
 
     <style name="Theme.DeliveryBox" parent="Base.Theme.DeliveryBox" />
 
-    <!-- 🔥 수정된 CustomButton 스타일 -->
+    <!-- themes.xml에 추가 -->
     <style name="CustomButton" parent="Widget.Material3.Button">
-        <item name="backgroundTint">@null</item> <!-- 테마 기본색 지움 -->
-        <item name="android:background">@drawable/rounded_background</item> <!-- 직접 배경 지정 -->
-        <item name="strokeColor">@android:color/transparent</item> <!-- 외곽선 없앰 -->
-        <item name="strokeWidth">0dp</item> <!-- 외곽선 두께 0 -->
-        <item name="rippleColor">@android:color/transparent</item> <!-- 클릭 효과 없음 -->
-        <item name="android:textColor">@android:color/white</item> <!-- 글자 흰색 -->
+        <item name="backgroundTint">@null</item>
+        <item name="android:background">@drawable/rounded_background</item>
+        <item name="strokeColor">@android:color/transparent</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="rippleColor">@android:color/transparent</item>
+        <item name="android:textColor">@android:color/white</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
+
+    <style name="CustomTextInputLayout" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusBottomEnd">8dp</item>
+        <item name="boxCornerRadiusBottomStart">8dp</item>
+        <item name="boxCornerRadiusTopEnd">8dp</item>
+        <item name="boxCornerRadiusTopStart">8dp</item>
+        <item name="errorEnabled">true</item>
     </style>
 </resources>

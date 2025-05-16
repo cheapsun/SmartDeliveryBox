@@ -2,11 +2,9 @@
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="24dp"
-    tools:context=".auth.LoginActivity">
+    android:padding="24dp">
 
     <!-- 제목 -->
     <TextView
@@ -16,7 +14,7 @@
         android:text="로그인"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:textColor="#000000"
+        android:textColor="@color/text_primary"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -62,39 +60,29 @@
     </com.google.android.material.textfield.TextInputLayout>
 
     <!-- 가입/비밀번호 찾기 -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/layout_links"
-        android:layout_width="0dp"
+    <TextView
+        android:id="@+id/tv_signup_full"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:text="계정이 없으신가요? 가입하기"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary"
         app:layout_constraintTop_toBottomOf="@id/layout_password"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:layout_marginTop="8dp"
+        android:padding="4dp"/>
 
-        <!-- 왼쪽: 가입하기 -->
-        <TextView
-            android:id="@+id/tv_signup_full"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="계정이 없으신가요? 가입하기"
-            android:textSize="14sp"
-            android:textColor="#666666"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            android:padding="4dp"/>
-
-        <!-- 오른쪽: 비밀번호 찾기 -->
-        <TextView
-            android:id="@+id/tv_forgot_password"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="비밀번호 찾기"
-            android:textSize="14sp"
-            android:textColor="#007BFF"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            android:padding="4dp"/>
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    <TextView
+        android:id="@+id/tv_forgot_password"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="비밀번호 재설정"
+        android:textSize="14sp"
+        android:textColor="@color/link_blue"
+        app:layout_constraintTop_toBottomOf="@id/layout_password"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"
+        android:padding="4dp"/>
 
     <!-- 로그인 버튼 -->
     <Button
@@ -103,9 +91,9 @@
         android:layout_height="wrap_content"
         android:text="로그인"
         android:textColor="@android:color/white"
-        android:backgroundTint="#6A8DFF"
+        android:backgroundTint="@color/primary_blue"
         android:enabled="false"
-        app:layout_constraintTop_toBottomOf="@id/layout_links"
+        app:layout_constraintTop_toBottomOf="@id/tv_signup_full"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="24dp" />

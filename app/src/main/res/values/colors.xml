@@ -1,7 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 기본 색상 -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- 브랜드 색상 -->
+    <color name="primary_blue">#6A8DFF</color>
+    <color name="primary_blue_dark">#5A7DEF</color>
+    <color name="primary_blue_light">#AABEFF</color>
+
+    <!-- 텍스트 색상 -->
+    <color name="text_primary">#333333</color>
+    <color name="text_secondary">#666666</color>
+    <color name="link_blue">#007BFF</color>
+
+    <!-- 기능 색상 -->
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FFA500</color>
+    <color name="error">#FF4444</color>
+    <color name="disabled">#AAAAAA</color>
+
+    <!-- 중립 색상 -->
+    <color name="gray_100">#F5F5F5</color>
+    <color name="gray_200">#EEEEEE</color>
+    <color name="gray_300">#E0E0E0</color>
+    <color name="gray_500">#9E9E9E</color>
+    <color name="gray_700">#616161</color>
+    <color name="gray_900">#212121</color>
 
     <color name="red">#D32F2F</color>
     <color name="doorlock_icon_red">#FF4444</color>
