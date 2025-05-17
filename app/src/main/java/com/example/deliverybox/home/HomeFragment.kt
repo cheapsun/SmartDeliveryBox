@@ -19,6 +19,11 @@ import com.example.deliverybox.dialog.RegisterBoxMethodDialogFragment
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.example.deliverybox.box.QrCodeValidationService
+import com.example.deliverybox.box.UserBoxInfo
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import android.content.Context
 
 class HomeFragment : Fragment() {
 
@@ -41,6 +46,8 @@ class HomeFragment : Fragment() {
             }
         }
 
+    private lateinit var validationService: QrCodeValidationService
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -51,9 +58,13 @@ class HomeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        validationService = QrCodeValidationService()
+
         setupRecyclerView()
         setupClickListeners()
-        loadBoxList()
+
+        smartLoadBoxList()
     }
 
     private fun setupRecyclerView() {
@@ -149,41 +160,106 @@ class HomeFragment : Fragment() {
             }
     }
 
-    // ✅ 새로운 메서드: 박스 세부 정보 로드
+    // ✅ 개선된 메서드: 박스 세부 정보 로드 (동시성 이슈 해결)
     private fun loadBoxDetails() {
+        if (boxList.isEmpty()) return
+
+        val boxIds = boxList.map { it.boxId }
+
+        // 배치로 박스 정보 조회 (성능 최적화)
+        if (boxIds.isNotEmpty()) {
+            // Firestore는 whereIn으로 최대 10개까지만 조회 가능
+            val batches = boxIds.chunked(10)
+
+            batches.forEach { batch ->
+                db.collection("boxes")
+                    .whereIn(com.google.firebase.firestore.FieldPath.documentId(), batch)
+                    .get()
+                    .addOnSuccessListener { querySnapshot ->
+                        if (!isAdded || _binding == null) return@addOnSuccessListener
+
+                        val boxMap = querySnapshot.documents.associate { doc ->
+                            doc.id to (doc.getString("boxName") ?: "택배함")
+                        }
+
+                        // UI 업데이트는 메인 스레드에서
+                        requireActivity().runOnUiThread {
+                            if (isAdded && _binding != null) {
+                                boxList.forEachIndexed { index, boxInfo ->
+                                    boxMap[boxInfo.boxId]?.let { boxName ->
+                                        boxList[index] = boxList[index].copy(boxName = boxName)
+                                    }
+                                }
+                                adapter.notifyDataSetChanged()
+
+                                // 패키지 수 로드
+                                loadPackageCountsBatch()
+                            }
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("HomeFragment", "박스 배치 조회 실패", e)
+                        // 실패 시 개별 조회로 폴백
+                        loadBoxDetailsIndividually()
+                    }
+            }
+        }
+    }
+
+    // 폴백용 개별 조회 메서드
+    private fun loadBoxDetailsIndividually() {
         boxList.forEachIndexed { index, boxInfo ->
-            // 박스 정보 로드
             db.collection("boxes").document(boxInfo.boxId)
                 .get()
                 .addOnSuccessListener { boxDoc ->
-                    if (boxDoc.exists()) {
-                        val boxName = boxDoc.getString("boxName") ?: "택배함"
-                        boxList[index] = boxList[index].copy(boxName = boxName)
-                        adapter.notifyItemChanged(index)
-                    }
+                    if (!isAdded || _binding == null) return@addOnSuccessListener
 
-                    // 패키지 수 로드
-                    loadPackageCount(boxInfo.boxId, index)
+                    // index 범위 체크 및 boxId 재확인 (동시성 이슈 방지)
+                    if (index < boxList.size && boxList[index].boxId == boxInfo.boxId) {
+                        if (boxDoc.exists()) {
+                            val boxName = boxDoc.getString("boxName") ?: "택배함"
+
+                            // UI 업데이트는 메인 스레드에서
+                            requireActivity().runOnUiThread {
+                                if (isAdded && _binding != null && index < boxList.size) {
+                                    boxList[index] = boxList[index].copy(boxName = boxName)
+                                    adapter.notifyItemChanged(index)
+                                }
+                            }
+                        }
+
+                        // 패키지 수 로드
+                        loadPackageCount(boxInfo.boxId, index)
+                    }
                 }
                 .addOnFailureListener { e ->
                     Log.e("HomeFragment", "박스 정보 로드 실패: ${boxInfo.boxId} - ${e.message}")
-                    // 실패해도 기본값 유지
+                    // 실패해도 패키지 수는 로드 시도
                     loadPackageCount(boxInfo.boxId, index)
                 }
         }
     }
 
-    // ✅ 새로운 메서드: 패키지 수 로드
+    // ✅ 개선된 메서드: 패키지 수 로드 (동시성 이슈 해결)
     private fun loadPackageCount(boxId: String, index: Int) {
         db.collection("boxes").document(boxId)
             .collection("packages")
             .whereEqualTo("isDelivered", false)
             .get()
             .addOnSuccessListener { packagesSnapshot ->
+                if (!isAdded || _binding == null) return@addOnSuccessListener
+
                 val packageCount = packagesSnapshot.size()
+
+                // index 범위 체크 및 boxId 재확인
                 if (index < boxList.size && boxList[index].boxId == boxId) {
-                    boxList[index] = boxList[index].copy(packageCount = packageCount)
-                    adapter.notifyItemChanged(index)
+                    // UI 업데이트는 메인 스레드에서
+                    requireActivity().runOnUiThread {
+                        if (isAdded && _binding != null && index < boxList.size) {
+                            boxList[index] = boxList[index].copy(packageCount = packageCount)
+                            adapter.notifyItemChanged(index)
+                        }
+                    }
                 }
             }
             .addOnFailureListener { e ->
@@ -212,6 +288,84 @@ class HomeFragment : Fragment() {
 
             // 현재 택배함 수 로깅 (디버깅용)
             Log.d("HomeFragment", "빈 상태 업데이트: isEmpty=$isEmpty, boxList.size=${boxList.size}")
+        }
+    }
+
+    // ✅ 새로운 메서드: 패키지 수 배치 로드 (성능 최적화)
+    private fun loadPackageCountsBatch() {
+        boxList.forEachIndexed { index, boxInfo ->
+            loadPackageCount(boxInfo.boxId, index)
+        }
+    }
+
+    // ✅ 새로운 메서드: QrCodeValidationService를 사용한 박스 목록 로드
+    private fun loadBoxListWithValidationService() {
+        if (!isAdded || _binding == null) return
+
+        lifecycleScope.launch {
+            try {
+                val result = validationService.getUserBoxes()
+
+                result.fold(
+                    onSuccess = { userBoxes ->
+                        if (!isAdded || _binding == null) return@fold
+
+                        requireActivity().runOnUiThread {
+                            if (isAdded && _binding != null) {
+                                // UserBoxInfo를 BoxInfo로 변환
+                                val newBoxList = userBoxes.map { userBox ->
+                                    BoxInfo(
+                                        boxId = userBox.boxCode,
+                                        alias = userBox.alias,
+                                        boxName = userBox.batchName,
+                                        packageCount = 0, // 패키지 수는 별도 로드
+                                        doorLocked = true
+                                    )
+                                }
+
+                                boxList.clear()
+                                boxList.addAll(newBoxList)
+
+                                sortBoxList()
+                                updateEmptyState(false)
+
+                                // 패키지 수 로드
+                                loadPackageCountsBatch()
+                            }
+                        }
+                    },
+                    onFailure = { error ->
+                        Log.e("HomeFragment", "ValidationService로 박스 목록 로드 실패", error)
+                        // 기존 방식으로 폴백
+                        loadBoxList()
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e("HomeFragment", "ValidationService 네트워크 오류", e)
+                // 기존 방식으로 폴백
+                loadBoxList()
+            }
+        }
+    }
+
+    // ✅ 새로운 메서드: 외부에서 호출 가능한 새로고침 (MainActivity에서 사용)
+    fun refreshBoxList() {
+        if (!isAdded || _binding == null) return
+
+        Log.d("HomeFragment", "박스 목록 새로고침 시작")
+
+        // ValidationService로 먼저 시도, 실패시 기존 방식으로 폴백
+        loadBoxListWithValidationService()
+    }
+
+    // ✅ 새로운 메서드: 빈 상태 확인 및 적절한 로딩 방식 선택
+    private fun smartLoadBoxList() {
+        if (boxList.isEmpty()) {
+            // 빈 상태면 ValidationService로 빠른 로드
+            loadBoxListWithValidationService()
+        } else {
+            // 기존 데이터가 있으면 실시간 리스너 사용
+            loadBoxList()
         }
     }
 

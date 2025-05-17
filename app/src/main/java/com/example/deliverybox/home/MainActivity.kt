@@ -13,6 +13,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.example.deliverybox.auth.LoginActivity
 import com.example.deliverybox.delivery.PackageFragment
+import android.widget.Toast
 
 class MainActivity : AppCompatActivity() {
 
@@ -38,17 +39,24 @@ class MainActivity : AppCompatActivity() {
         // 2️⃣ Firestore에서 사용자 문서 읽기 (실패해도 홈 화면 진입)
         db.collection("users").document(uid).get()
             .addOnSuccessListener {
-                // 따로 처리할 로직이 없으면 홈으로 이동
-                replaceFragment(HomeFragment())
+                // 성공 시에도 홈 화면 표시
+                if (supportFragmentManager.findFragmentById(R.id.frameLayout) == null) {
+                    replaceFragment(HomeFragment())
+                }
             }
             .addOnFailureListener {
-                replaceFragment(HomeFragment())
+                // 실패 시에도 홈 화면 표시
+                if (supportFragmentManager.findFragmentById(R.id.frameLayout) == null) {
+                    replaceFragment(HomeFragment())
+                }
             }
 
-        // 3️⃣ 앱 시작 시 기본으로 HomeFragment 표시
-        replaceFragment(HomeFragment())
+        // 3️⃣ 초기 Fragment 설정 (Firestore 로드와 별개로)
+        if (supportFragmentManager.findFragmentById(R.id.frameLayout) == null) {
+            replaceFragment(HomeFragment())
+        }
 
-        // 4️⃣ 바텀 네비게이션 클릭 리스너
+        // 4️⃣ 바텀 네비게이션 클릭 리스너 (기존 코드 유지)
         binding.bottomNavigation.setOnItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.menu_home -> {
@@ -76,10 +84,69 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent) // 새로운 Intent로 업데이트
+
+        // 택배함 등록 후 목록 새로고침 처리
+        if (intent?.getBooleanExtra("refresh_boxes", false) == true) {
+            refreshBoxList()
+
+            // 성공 메시지 표시
+            if (intent.getBooleanExtra("show_success_message", false)) {
+                Toast.makeText(this, "택배함이 성공적으로 등록되었습니다", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     // Fragment 교체 유틸 함수
     private fun replaceFragment(fragment: Fragment) {
         supportFragmentManager.beginTransaction()
             .replace(R.id.frameLayout, fragment)
             .commit()
+    }
+
+    /**
+     * HomeFragment의 박스 목록을 새로고침
+     * RegisterBoxActivity에서 택배함 등록 후 호출됨
+     */
+    private fun refreshBoxList() {
+        try {
+            // Fragment 컨테이너에서 현재 표시된 Fragment 찾기
+            val currentFragment = supportFragmentManager.findFragmentById(R.id.frameLayout)
+
+            when (currentFragment) {
+                is HomeFragment -> {
+                    // HomeFragment의 새로고침 메서드 호출
+                    currentFragment.refreshBoxList()
+
+                    // 홈 탭으로 이동 (다른 탭에 있을 경우)
+                    binding.bottomNavigation.selectedItemId = R.id.menu_home
+                }
+                else -> {
+                    // 현재 HomeFragment가 아니면 홈으로 이동
+                    binding.bottomNavigation.selectedItemId = R.id.menu_home
+                    replaceFragment(HomeFragment())
+                }
+            }
+        } catch (e: Exception) {
+            // 오류 발생 시 로그 출력 및 홈으로 이동
+            android.util.Log.e("MainActivity", "박스 목록 새로고침 중 오류", e)
+            binding.bottomNavigation.selectedItemId = R.id.menu_home
+            replaceFragment(HomeFragment())
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        // Intent로부터 새로고침 플래그 확인
+        if (intent?.getBooleanExtra("refresh_boxes", false) == true) {
+            // 플래그를 제거하여 중복 실행 방지
+            intent.removeExtra("refresh_boxes")
+            intent.removeExtra("show_success_message")
+
+            refreshBoxList()
+        }
     }
 }

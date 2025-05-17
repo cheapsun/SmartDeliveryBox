@@ -11,17 +11,29 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import java.util.UUID
+import com.example.deliverybox.box.QrCodeValidationService
+import android.content.Context
+import android.view.inputmethod.InputMethodManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import android.util.Log
+import com.example.deliverybox.auth.LoginActivity
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 
 class RegisterBoxActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityRegisterBoxBinding
     private val db by lazy { FirebaseFirestore.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
+    private lateinit var validationService: QrCodeValidationService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityRegisterBoxBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        validationService = QrCodeValidationService()
 
         // QR 코드로 전달된 경우 처리
         val qrCode = intent.getStringExtra("qr_code")
@@ -35,6 +47,10 @@ class RegisterBoxActivity : AppCompatActivity() {
 
             // 포커스를 별칭 입력 필드로 이동
             binding.etBoxAlias.requestFocus()
+
+            // 🆕 키보드 자동 표시 추가
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(binding.etBoxAlias, InputMethodManager.SHOW_IMPLICIT)
         }
 
         // 🔁 툴바 뒤로가기 버튼
@@ -44,15 +60,103 @@ class RegisterBoxActivity : AppCompatActivity() {
 
         // 등록 버튼 클릭
         binding.btnRegisterOrClaim.setOnClickListener {
-            val code = binding.etBoxCode.text.toString().trim().uppercase()
+            val code = binding.etBoxCode.text.toString().trim()
             val alias = binding.etBoxAlias.text.toString().trim()
 
             if (code.isNotEmpty()) {
-                claimBox(code, alias)
+                registerBoxWithValidation(code, alias)
             } else {
                 createNewBox(alias)
             }
         }
+    }
+
+    /** 🆕 새로운 QR 검증 기반 등록 메서드 */
+    private fun registerBoxWithValidation(code: String, alias: String) {
+
+        // 🔍 디버깅: 인증 상태 확인
+        val currentUser = auth.currentUser
+        Log.d("RegisterBoxActivity", "현재 사용자: ${currentUser?.uid}")
+        Log.d("RegisterBoxActivity", "사용자 이메일: ${currentUser?.email}")
+        Log.d("RegisterBoxActivity", "인증 토큰: ${currentUser?.getIdToken(false)}")
+
+        if (currentUser == null) {
+            Toast.makeText(this, "로그인이 필요합니다", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
+
+
+        // 네트워크 및 인증 상태 확인
+        if (!checkNetworkAndAuth()) {
+            return
+        }
+
+        // 유효성 검사
+        if (alias.isEmpty()) {
+            binding.etBoxAlias.error = "별칭을 입력해주세요"
+            return
+        }
+
+        if (alias.length < 2) {
+            binding.etBoxAlias.error = "별칭은 2자 이상 입력해주세요"
+            return
+        }
+
+        // 에러 메시지 초기화
+        binding.layoutBoxCode.error = null
+        binding.layoutBoxAlias.error = null
+
+        // 버튼 비활성화 및 로딩 표시
+        binding.btnRegisterOrClaim.isEnabled = false
+        binding.btnRegisterOrClaim.text = "등록 중..."
+
+        // Firebase 등록 진행
+        lifecycleScope.launch {
+            try {
+                Log.d("RegisterBoxActivity", "QrCodeValidationService 등록 시작: $code")
+                val result = validationService.registerValidatedBox(code, alias)
+
+                result.fold(
+                    onSuccess = { message ->
+                        Log.d("RegisterBoxActivity", "등록 성공: $message")
+                        // 등록 성공
+                        Toast.makeText(this@RegisterBoxActivity, message, Toast.LENGTH_SHORT).show()
+
+                        // MainActivity로 이동하며 목록 새로고침
+                        val intent = Intent(this@RegisterBoxActivity, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            putExtra("refresh_boxes", true)
+                            putExtra("show_success_message", true)
+                        }
+                        startActivity(intent)
+                        finish()
+                    },
+                    onFailure = { error ->
+                        Log.e("RegisterBoxActivity", "QrCodeValidationService 등록 실패", error)
+                        // 등록 실패 - 기존 claimBox 방식으로 시도
+                        Toast.makeText(this@RegisterBoxActivity,
+                            "새로운 방식 등록 실패: ${error.message}. 기존 방식으로 시도합니다.",
+                            Toast.LENGTH_SHORT).show()
+                        claimBox(code, alias)
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e("RegisterBoxActivity", "네트워크 오류", e)
+                // 네트워크 오류 시 기존 방식으로 시도
+                Toast.makeText(this@RegisterBoxActivity,
+                    "네트워크 오류 발생. 기존 방식으로 시도합니다.",
+                    Toast.LENGTH_SHORT).show()
+                claimBox(code, alias)
+            }
+        }
+    }
+
+    /** 🔄 버튼 상태 복구 */
+    private fun resetButtonState() {
+        binding.btnRegisterOrClaim.isEnabled = true
+        binding.btnRegisterOrClaim.text = "등록하기"
     }
 
     override fun onBackPressed() {
@@ -112,9 +216,11 @@ class RegisterBoxActivity : AppCompatActivity() {
 
             boxId
         }.addOnSuccessListener { boxId ->
+            resetButtonState()
             Toast.makeText(this, "박스($boxId) 등록 완료!", Toast.LENGTH_SHORT).show()
             finish()
         }.addOnFailureListener {
+            resetButtonState()
             Toast.makeText(this, it.message ?: "등록 실패", Toast.LENGTH_SHORT).show()
         }
     }
@@ -156,5 +262,50 @@ class RegisterBoxActivity : AppCompatActivity() {
             .addOnFailureListener {
                 Toast.makeText(this, "생성 실패: ${it.message}", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    // 네트워크 상태 확인 메서드
+    private fun isNetworkAvailable(): Boolean {
+        return try {
+            val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = connectivityManager.activeNetwork ?: return false
+            val activeNetwork = connectivityManager.getNetworkCapabilities(network) ?: return false
+            activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+        } catch (e: Exception) {
+            Log.e("RegisterBoxActivity", "네트워크 상태 확인 실패", e)
+            false
+        }
+    }
+
+    // registerBoxWithValidation 메서드 시작 부분에 추가할 네트워크 체크
+    private fun checkNetworkAndAuth(): Boolean {
+        // 네트워크 상태 확인
+        if (!isNetworkAvailable()) {
+            Toast.makeText(this, "인터넷 연결을 확인해주세요", Toast.LENGTH_SHORT).show()
+            resetButtonState()
+            return false
+        }
+
+        // 인증 상태 확인
+        val currentUser = auth.currentUser
+        Log.d("RegisterBoxActivity", "현재 사용자: ${currentUser?.uid}")
+        Log.d("RegisterBoxActivity", "사용자 이메일: ${currentUser?.email}")
+
+        if (currentUser == null) {
+            Toast.makeText(this, "로그인이 필요합니다", Toast.LENGTH_SHORT).show()
+            // LoginActivity 경로 확인 필요
+            try {
+                startActivity(Intent(this, LoginActivity::class.java))
+            } catch (e: Exception) {
+                Log.e("RegisterBoxActivity", "LoginActivity를 찾을 수 없습니다", e)
+                Toast.makeText(this, "로그인 화면으로 이동할 수 없습니다", Toast.LENGTH_SHORT).show()
+            }
+            resetButtonState()
+            finish()
+            return false
+        }
+
+        return true
     }
 }
