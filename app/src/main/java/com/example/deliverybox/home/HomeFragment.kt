@@ -40,11 +40,37 @@ class HomeFragment : Fragment() {
     private var boxesListener: ListenerRegistration? = null
 
     private val registerBoxLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            if (it.resultCode == android.app.Activity.RESULT_OK) {
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            // 🆕 결과와 관계없이 다이얼로그 닫기
+            dismissRegisterBoxDialog()
+
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
                 updateEmptyState()
             }
         }
+
+    // 🆕 HomeFragment에 다이얼로그 닫기 메서드 추가
+    private fun dismissRegisterBoxDialog() {
+        try {
+            val dialogFragment = parentFragmentManager.findFragmentByTag("RegisterBoxMethodDialog")
+            if (dialogFragment is RegisterBoxMethodDialogFragment) {
+                dialogFragment.dismiss()
+            }
+        } catch (e: Exception) {
+            Log.d("HomeFragment", "다이얼로그 닫기 실패 (정상): ${e.message}")
+        }
+    }
+
+    // 🆕 Fragment가 다시 보여질 때도 다이얼로그 상태 확인
+    override fun onResume() {
+        super.onResume()
+
+        // Activity로부터 등록 성공 신호를 받았는지 확인
+        if (requireActivity().intent?.getBooleanExtra("refresh_boxes", false) == true) {
+            // 다이얼로그 닫기
+            dismissRegisterBoxDialog()
+        }
+    }
 
     private lateinit var validationService: QrCodeValidationService
 
@@ -61,16 +87,20 @@ class HomeFragment : Fragment() {
 
         validationService = QrCodeValidationService()
 
+        Log.d("HomeFragment", "onViewCreated 시작")
         setupRecyclerView()
         setupClickListeners()
-
         smartLoadBoxList()
+        Log.d("HomeFragment", "onViewCreated 완료")
     }
 
     private fun setupRecyclerView() {
+        Log.d("HomeFragment", "🔧 RecyclerView 설정 시작")
+
         adapter = BoxListAdapter(
             boxList = boxList,
             onItemClick = { boxInfo ->
+                Log.d("HomeFragment", "📱 아이템 클릭: ${boxInfo.alias}")
                 val intent = Intent(requireContext(), BoxDetailActivity::class.java).apply {
                     putExtra("boxId", boxInfo.boxId)
                     putExtra("boxName", boxInfo.boxName)
@@ -79,7 +109,15 @@ class HomeFragment : Fragment() {
                 startActivity(intent)
             },
             onMainBoxToggle = { boxInfo, setAsMain ->
-                // 메인 박스 설정/해제 처리
+                Log.d("HomeFragment", "🎯 메인 박스 토글 콜백 호출: ${boxInfo.alias} -> $setAsMain")
+
+                // Fragment 상태 확인
+                if (!isAdded || context == null || isDetached || isRemoving) {
+                    Log.w("HomeFragment", "❌ Fragment 상태가 유효하지 않음")
+                    return@BoxListAdapter
+                }
+
+                // 메인 박스 토글 처리
                 handleMainBoxToggle(boxInfo, setAsMain)
             }
         )
@@ -88,7 +126,14 @@ class HomeFragment : Fragment() {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = this@HomeFragment.adapter
             setHasFixedSize(true)
+
+            // 아이템 애니메이션 개선
+            itemAnimator?.apply {
+                changeDuration = 300
+                moveDuration = 300
+            }
         }
+        Log.d("HomeFragment", "RecyclerView 및 Adapter 설정 완료")
     }
 
     private fun setupClickListeners() {
@@ -97,6 +142,12 @@ class HomeFragment : Fragment() {
     }
 
     private fun showRegisterBoxDialog() {
+        // 기존 다이얼로그가 있으면 먼저 닫기
+        val existingDialog = parentFragmentManager.findFragmentByTag("RegisterBoxMethodDialog")
+        if (existingDialog is RegisterBoxMethodDialogFragment) {
+            existingDialog.dismiss()
+        }
+
         val dialog = RegisterBoxMethodDialogFragment()
         dialog.setOnRegisterBoxSelectedListener {
             val intent = Intent(requireContext(), RegisterBoxActivity::class.java)
@@ -109,13 +160,25 @@ class HomeFragment : Fragment() {
      * 메인 박스 설정/해제 처리
      */
     private fun handleMainBoxToggle(boxInfo: BoxInfo, setAsMain: Boolean) {
-        val uid = auth.currentUser?.uid ?: return
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            Log.e("HomeFragment", "사용자가 로그인되어 있지 않음")
+            Toast.makeText(
+                requireContext(),
+                "로그인이 필요합니다",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
 
         // 현재 상태와 동일하면 처리하지 않음
         val isCurrentlyMain = boxInfo.boxId == mainBoxId
         if (setAsMain == isCurrentlyMain) {
+            Log.d("HomeFragment", "메인 박스 상태 변경 없음: $setAsMain")
             return
         }
+
+        Log.d("HomeFragment", "메인 박스 변경: ${boxInfo.alias} -> setAsMain: $setAsMain")
 
         val updateData = if (setAsMain) {
             mapOf("mainBoxId" to boxInfo.boxId)
@@ -123,12 +186,25 @@ class HomeFragment : Fragment() {
             mapOf("mainBoxId" to "")  // 메인 박스 해제시 빈 문자열로 설정
         }
 
+        // UI 즉시 업데이트 (낙관적 업데이트)
+        val previousMainBoxId = mainBoxId
+        mainBoxId = if (setAsMain) boxInfo.boxId else ""
+        adapter.updateMainBoxId(mainBoxId)
+
+        // 버튼 비활성화로 중복 클릭 방지
+        adapter.updateMainBoxId("updating") // 임시로 업데이트 중 상태 표시
+
         db.collection("users").document(uid)
             .update(updateData)
             .addOnSuccessListener {
                 // 성공 시 로컬 상태 업데이트
                 mainBoxId = if (setAsMain) boxInfo.boxId else ""
                 adapter.updateMainBoxId(mainBoxId)
+
+                Log.d("HomeFragment", "✅ 메인 박스 설정 성공: -> $mainBoxId")
+
+                // 리스트 재정렬
+                sortBoxList()
 
                 // 사용자에게 피드백
                 Toast.makeText(
@@ -140,6 +216,12 @@ class HomeFragment : Fragment() {
             }
             .addOnFailureListener { e ->
                 Log.e("HomeFragment", "메인 박스 설정 실패: ${e.message}")
+
+                // 실패 시 원래 상태로 복구
+                mainBoxId = previousMainBoxId
+                adapter.updateMainBoxId(mainBoxId)
+                sortBoxList()
+
                 Toast.makeText(
                     requireContext(),
                     "설정 변경 실패: ${e.message}",
@@ -159,37 +241,52 @@ class HomeFragment : Fragment() {
 
         boxesListener = db.collection("users").document(userUid)
             .addSnapshotListener { snapshot, error ->
+                Log.d("HomeFragment", "🎯 스냅샷 리스너 호출됨")
+
                 if (error != null) {
-                    Log.e("HomeFragment", "데이터 로드 실패: ${error.message}")
-                    Toast.makeText(requireContext(), "택배함 정보 로드 실패: ${error.message}", Toast.LENGTH_SHORT).show()
+                    Log.e("HomeFragment", "❌ 데이터 로드 실패: ${error.message}")
                     return@addSnapshotListener
                 }
 
                 if (snapshot == null || !snapshot.exists()) {
-                    Log.w("HomeFragment", "사용자 문서 없음")
+                    Log.w("HomeFragment", "⚠️ 사용자 문서 없음")
                     updateEmptyState(true)
                     return@addSnapshotListener
                 }
 
-                Log.d("HomeFragment", "사용자 문서 데이터: ${snapshot.data}")
+                Log.d("HomeFragment", "📄 사용자 문서 존재함: ${snapshot.exists()}")
+                Log.d("HomeFragment", "📊 전체 문서 데이터: ${snapshot.data}")
 
-                // 단순화: 직접 맵으로 가져오기
+                // mainBoxId 직접 확인
+                val rawMainBoxId = snapshot.get("mainBoxId")
+                Log.d("HomeFragment", "🔍 RAW mainBoxId: $rawMainBoxId (타입: ${rawMainBoxId?.javaClass?.simpleName})")
+
+                val newMainBoxId = snapshot.getString("mainBoxId") ?: ""
+                Log.d("HomeFragment", "🔍 Firestore에서 로드된 mainBoxId: '$newMainBoxId' (길이: ${newMainBoxId.length})")
+                Log.d("HomeFragment", "🔍 이전 mainBoxId: '$mainBoxId' (길이: ${mainBoxId.length})")
+
+                // mainBoxId 업데이트
+                val oldMainBoxId = mainBoxId
+                mainBoxId = newMainBoxId
+
+                if (oldMainBoxId != newMainBoxId) {
+                    Log.d("HomeFragment", "✅ mainBoxId 변경됨: '$oldMainBoxId' -> '$newMainBoxId'")
+                } else {
+                    Log.d("HomeFragment", "🔄 mainBoxId 변경 없음: '$mainBoxId'")
+                }
+
+                // boxAliases 확인
                 val boxAliases = snapshot.get("boxAliases") as? Map<String, String> ?: emptyMap()
-                mainBoxId = snapshot.getString("mainBoxId") ?: ""
-
-                Log.d("HomeFragment", "boxAliases: $boxAliases")
-                Log.d("HomeFragment", "mainBoxId: $mainBoxId")
+                Log.d("HomeFragment", "📦 boxAliases: $boxAliases")
 
                 if (boxAliases.isEmpty()) {
-                    Log.w("HomeFragment", "등록된 택배함 없음")
+                    Log.w("HomeFragment", "⚠️ 등록된 택배함 없음")
                     updateEmptyState(true)
                     return@addSnapshotListener
                 }
 
-                // 단순화: 직접 boxList에 추가하고 비동기로 세부 정보 업데이트
+                // 박스 리스트 구성
                 boxList.clear()
-
-                // 모든 박스를 기본 정보로 먼저 추가
                 boxAliases.forEach { (boxId, alias) ->
                     val boxInfo = BoxInfo(
                         boxId = boxId,
@@ -199,13 +296,16 @@ class HomeFragment : Fragment() {
                         doorLocked = true
                     )
                     boxList.add(boxInfo)
+                    Log.d("HomeFragment", "📦 박스 추가: $boxId -> $alias")
                 }
 
-                // UI 즉시 갱신 (기본 정보로)
+                // 어댑터 업데이트
+                Log.d("HomeFragment", "🔄 어댑터에 mainBoxId 전달 전: '$mainBoxId'")
+                adapter.updateMainBoxId(mainBoxId)
+                Log.d("HomeFragment", "🔄 어댑터에 mainBoxId 전달 완료")
+
                 sortBoxList()
                 updateEmptyState(false)
-
-                // 각 박스의 세부 정보를 비동기로 로드
                 loadBoxDetails()
             }
     }
@@ -410,13 +510,21 @@ class HomeFragment : Fragment() {
 
     // 새로운 메서드: 빈 상태 확인 및 적절한 로딩 방식 선택
     private fun smartLoadBoxList() {
+        Log.d("HomeFragment", "🚀 smartLoadBoxList 시작")
+
         if (boxList.isEmpty()) {
+            Log.d("HomeFragment", "📦 빈 상태 - ValidationService로 로드 시도")
             // 빈 상태면 ValidationService로 빠른 로드
             loadBoxListWithValidationService()
         } else {
+            Log.d("HomeFragment", "📦 기존 데이터 있음 - 실시간 리스너 사용")
             // 기존 데이터가 있으면 실시간 리스너 사용
             loadBoxList()
         }
+
+        // 강제로 Firestore 리스너도 시작
+        Log.d("HomeFragment", "🔄 강제 Firestore 리스너 시작")
+        loadBoxList()
     }
 
     override fun onDestroyView() {

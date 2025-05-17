@@ -185,8 +185,9 @@ class QrScanActivity : AppCompatActivity() {
                                 val intent = Intent(this@QrScanActivity, RegisterBoxActivity::class.java).apply {
                                     putExtra(RESULT_QR_CODE, scannedCode)
                                     putExtra("from_qr_scan", true)
+                                    putExtra("already_validated", true)
                                 }
-                                setResult(RESULT_OK, intent)
+                                startActivity(intent)
                                 finish()
                             }
                             else -> {

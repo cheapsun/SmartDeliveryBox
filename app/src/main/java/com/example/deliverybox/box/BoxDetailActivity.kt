@@ -3,6 +3,7 @@ package com.example.deliverybox.box
 import android.os.Bundle
 import android.widget.Toast
 import android.content.Intent
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import adapter.LogAdapter
@@ -75,8 +76,18 @@ class BoxDetailActivity : AppCompatActivity() {
                 val mainBoxId = userDoc.getString("mainBoxId") ?: ""
                 isMainBox = mainBoxId == boxId
 
-                // 체크박스 상태 업데이트
+                Log.d("BoxDetailActivity", "메인 박스 상태 확인: $boxId, 메인: $isMainBox")
+
+                // 체크박스 상태 업데이트 (리스너 없이)
+                binding.switchMainBox.setOnCheckedChangeListener(null)
                 binding.switchMainBox.isChecked = isMainBox
+                setupListeners() // 리스너 다시 설정
+            }
+            .addOnFailureListener { e ->
+                Log.e("BoxDetailActivity", "메인 박스 상태 확인 실패: ${e.message}")
+                // 실패 시 기본값으로 설정
+                isMainBox = false
+                binding.switchMainBox.isChecked = false
             }
     }
 
@@ -124,7 +135,13 @@ class BoxDetailActivity : AppCompatActivity() {
 
         // 메인 박스 설정 스위치 리스너
         binding.switchMainBox.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked != isMainBox) {  // 상태가 변경된 경우에만 처리
+            Log.d("BoxDetailActivity", "스위치 상태 변경: $isChecked, 현재 메인: $isMainBox")
+
+            // 상태가 실제로 변경된 경우에만 처리
+            if (isChecked != isMainBox) {
+                // 스위치 임시 비활성화로 중복 클릭 방지
+                binding.switchMainBox.isEnabled = false
+
                 setAsMainBox(isChecked)
             }
         }
@@ -132,6 +149,9 @@ class BoxDetailActivity : AppCompatActivity() {
 
     private fun setAsMainBox(setAsMain: Boolean) {
         val uid = auth.currentUser?.uid ?: return
+            binding.switchMainBox.isEnabled = true
+
+        Log.d("BoxDetailActivity", "메인 박스 설정 변경: $boxId -> $setAsMain")
 
         // 메인 박스로 설정 또는 해제
         val updateData = if (setAsMain) {
@@ -143,7 +163,14 @@ class BoxDetailActivity : AppCompatActivity() {
         db.collection("users").document(uid)
             .update(updateData)
             .addOnSuccessListener {
+                // 성공 시 상태 업데이트
                 isMainBox = setAsMain
+
+                // 스위치 다시 활성화
+                binding.switchMainBox.isEnabled = true
+
+                Log.d("BoxDetailActivity", "메인 박스 설정 성공: $setAsMain")
+
                 Toast.makeText(
                     this,
                     if (setAsMain) "메인 택배함으로 설정되었습니다" else "메인 택배함 설정이 해제되었습니다",
@@ -151,8 +178,12 @@ class BoxDetailActivity : AppCompatActivity() {
                 ).show()
             }
             .addOnFailureListener { e ->
-                // 실패시 체크박스 상태 되돌리기
+                Log.e("BoxDetailActivity", "메인 박스 설정 실패: ${e.message}")
+
+                // 실패시 스위치 상태 되돌리기
                 binding.switchMainBox.isChecked = isMainBox
+                binding.switchMainBox.isEnabled = true
+
                 Toast.makeText(this, "설정 변경 실패: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }

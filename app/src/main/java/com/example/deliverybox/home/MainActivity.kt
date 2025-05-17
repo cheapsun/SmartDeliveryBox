@@ -99,6 +99,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // 🆕 다이얼로그 닫기 메서드 추가
+    private fun dismissRegisterBoxDialog() {
+        try {
+            // Fragment Manager에서 다이얼로그 찾아서 닫기
+            val dialogFragment = supportFragmentManager.findFragmentByTag("RegisterBoxMethodDialog")
+            if (dialogFragment is androidx.fragment.app.DialogFragment) {
+                dialogFragment.dismiss()
+            }
+        } catch (e: Exception) {
+            // 다이얼로그가 없거나 이미 닫혀있는 경우 무시
+            android.util.Log.d("MainActivity", "다이얼로그 닫기 실패 (정상): ${e.message}")
+        }
+    }
+
     // Fragment 교체 유틸 함수
     private fun replaceFragment(fragment: Fragment) {
         supportFragmentManager.beginTransaction()
@@ -145,6 +159,9 @@ class MainActivity : AppCompatActivity() {
             // 플래그를 제거하여 중복 실행 방지
             intent.removeExtra("refresh_boxes")
             intent.removeExtra("show_success_message")
+
+            // 다이얼로그 닫기
+            dismissRegisterBoxDialog()
 
             refreshBoxList()
         }
