@@ -111,120 +111,107 @@ class HomeFragment : Fragment() {
                 }
 
                 Log.d("HomeFragment", "사용자 문서 데이터: ${snapshot.data}")
+
+                // ✅ 단순화: 직접 맵으로 가져오기
+                val boxAliases = snapshot.get("boxAliases") as? Map<String, String> ?: emptyMap()
+                mainBoxId = snapshot.getString("mainBoxId") ?: ""
+
+                Log.d("HomeFragment", "boxAliases: $boxAliases")
+                Log.d("HomeFragment", "mainBoxId: $mainBoxId")
+
+                if (boxAliases.isEmpty()) {
+                    Log.w("HomeFragment", "등록된 택배함 없음")
+                    updateEmptyState(true)
+                    return@addSnapshotListener
+                }
+
+                // ✅ 단순화: 직접 boxList에 추가하고 비동기로 세부 정보 업데이트
                 boxList.clear()
 
-                // boxAliases 맵 가져오기 (key: boxId, value: alias)
-                val boxAliases = snapshot.get("boxAliases") as? Map<String, String> ?: emptyMap()
-                val mainBoxId = snapshot.getString("mainBoxId")
-
-                if (boxAliases.isEmpty() && mainBoxId.isNullOrEmpty()) {
-                    Log.w("HomeFragment", "boxAliases와 mainBoxId 모두 없음")
-                    updateEmptyState(true)
-                    return@addSnapshotListener
-                }
-
-                // 모든 박스를 처리할 맵 생성
-                val boxesToProcess = mutableMapOf<String, String>()
-
-                // 모든 알려진 박스 별칭 추가
+                // 모든 박스를 기본 정보로 먼저 추가
                 boxAliases.forEach { (boxId, alias) ->
-                    boxesToProcess[boxId] = alias
+                    val boxInfo = BoxInfo(
+                        boxId = boxId,
+                        alias = alias,
+                        boxName = "로딩 중...",
+                        packageCount = 0,
+                        doorLocked = true
+                    )
+                    boxList.add(boxInfo)
                 }
 
-                // mainBoxId가 있지만 boxAliases에 없는 경우 추가
-                if (!mainBoxId.isNullOrEmpty() && !boxesToProcess.containsKey(mainBoxId)) {
-                    boxesToProcess[mainBoxId] = "내 택배함"
-                }
+                // UI 즉시 갱신 (기본 정보로)
+                sortBoxList()
+                updateEmptyState(false)
 
-                if (boxesToProcess.isEmpty()) {
-                    Log.w("HomeFragment", "처리할 박스 없음")
-                    updateEmptyState(true)
-                    return@addSnapshotListener
-                }
-
-                val totalBoxCount = boxesToProcess.size
-                var processedCount = 0
-
-                // 각 택배함 정보 로드 및 표시
-                for ((boxId, alias) in boxesToProcess) {
-                    val currentBoxId = boxId
-                    val currentAlias = alias
-
-                    db.collection("boxes").document(currentBoxId)
-                        .get()
-                        .addOnSuccessListener { boxDoc ->
-                            if (!boxDoc.exists()) {
-                                processedCount++
-                                if (processedCount == boxesToProcess.size) {
-                                    updateEmptyState(boxList.isEmpty())
-                                }
-                                return@addOnSuccessListener
-                            }
-
-                            val boxName = boxDoc.getString("boxName") ?: "택배함"
-                            val boxInfo = BoxInfo(
-                                boxId = currentBoxId,
-                                alias = currentAlias,
-                                boxName = boxName,
-                                packageCount = 0,
-                                doorLocked = true
-                            )
-
-                            // boxList에 추가하고 UI 갱신
-                            boxList.add(boxInfo)
-
-                            // 모든 박스 처리가 완료되면 정렬 진행
-                            processedCount++
-                            if (processedCount >= totalBoxCount) {
-                                sortBoxList()
-                            }
-
-                            // 택배 수 정보 로드
-                            db.collection("boxes").document(currentBoxId)
-                                .collection("packages")
-                                .whereEqualTo("isDelivered", false)
-                                .get()
-                                .addOnSuccessListener { packagesSnapshot ->
-                                    val packageCount = packagesSnapshot.size()
-                                    val index = boxList.indexOfFirst { it.boxId == currentBoxId }
-                                    if (index >= 0) {
-                                        boxList[index] = boxList[index].copy(packageCount = packageCount)
-                                        adapter.notifyItemChanged(index)
-                                    }
-                                }
-                                .addOnFailureListener { e ->
-                                    Log.e("HomeFragment", "택배 수 로드 실패: ${e.message}")
-                                }
-
-                            processedCount++
-                        }
-                        .addOnFailureListener { e ->
-                            processedCount++
-                            if (processedCount == boxesToProcess.size) {
-                                updateEmptyState(boxList.isEmpty())
-                            }
-                        }
-                }
+                // ✅ 단순화: 각 박스의 세부 정보를 비동기로 로드
+                loadBoxDetails()
             }
     }
 
-    // 정렬 로직을 별도 함수로 분리
+    // ✅ 새로운 메서드: 박스 세부 정보 로드
+    private fun loadBoxDetails() {
+        boxList.forEachIndexed { index, boxInfo ->
+            // 박스 정보 로드
+            db.collection("boxes").document(boxInfo.boxId)
+                .get()
+                .addOnSuccessListener { boxDoc ->
+                    if (boxDoc.exists()) {
+                        val boxName = boxDoc.getString("boxName") ?: "택배함"
+                        boxList[index] = boxList[index].copy(boxName = boxName)
+                        adapter.notifyItemChanged(index)
+                    }
+
+                    // 패키지 수 로드
+                    loadPackageCount(boxInfo.boxId, index)
+                }
+                .addOnFailureListener { e ->
+                    Log.e("HomeFragment", "박스 정보 로드 실패: ${boxInfo.boxId} - ${e.message}")
+                    // 실패해도 기본값 유지
+                    loadPackageCount(boxInfo.boxId, index)
+                }
+        }
+    }
+
+    // ✅ 새로운 메서드: 패키지 수 로드
+    private fun loadPackageCount(boxId: String, index: Int) {
+        db.collection("boxes").document(boxId)
+            .collection("packages")
+            .whereEqualTo("isDelivered", false)
+            .get()
+            .addOnSuccessListener { packagesSnapshot ->
+                val packageCount = packagesSnapshot.size()
+                if (index < boxList.size && boxList[index].boxId == boxId) {
+                    boxList[index] = boxList[index].copy(packageCount = packageCount)
+                    adapter.notifyItemChanged(index)
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("HomeFragment", "패키지 수 로드 실패: $boxId - ${e.message}")
+            }
+    }
+
+    // ✅ 단순화된 정렬 메서드
     private fun sortBoxList() {
+        Log.d("HomeFragment", "박스 리스트 정렬 시작 - 총 ${boxList.size}개")
+
         // 메인 박스를 최상단에 배치
-        boxList.sortWith(compareBy {
-            it.boxId != mainBoxId  // mainBoxId가 false(0)로 평가되어 상단에 배치
-        })
+        boxList.sortWith(compareBy { it.boxId != mainBoxId })
 
         // 어댑터 업데이트
         adapter.updateMainBoxId(mainBoxId)
         adapter.notifyDataSetChanged()
-        updateEmptyState(boxList.isEmpty())
+
+        Log.d("HomeFragment", "박스 리스트 정렬 완료")
     }
 
     private fun updateEmptyState(isEmpty: Boolean = boxList.isEmpty()) {
         _binding?.let { binding ->
             binding.layoutEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
             binding.recyclerViewBoxes.visibility = if (isEmpty) View.GONE else View.VISIBLE
+
+            // 현재 택배함 수 로깅 (디버깅용)
+            Log.d("HomeFragment", "빈 상태 업데이트: isEmpty=$isEmpty, boxList.size=${boxList.size}")
         }
     }
 

@@ -54,13 +54,27 @@ class RegisterBoxActivity : AppCompatActivity() {
     private fun claimBox(code: String, alias: String) {
         val uid = auth.currentUser?.uid ?: return
         val codeRef = db.collection("boxCodes").document(code)
+        val userRef = db.collection("users").document(uid)
 
         db.runTransaction { tx ->
-            val snap = tx.get(codeRef)
-            if (!snap.exists()) throw Exception("존재하지 않는 코드입니다.")
-            if (snap.getBoolean("active") == false) throw Exception("이미 사용된 코드입니다.")
-            val boxId = snap.getString("boxId") ?: throw Exception("boxId 없음")
+            // ✅ 모든 read 작업을 먼저 실행
+            val codeSnap = tx.get(codeRef)
+            val userDoc = tx.get(userRef)
 
+            // ✅ validation (모든 read 완료 후)
+            if (!codeSnap.exists()) throw Exception("존재하지 않는 코드입니다.")
+            if (codeSnap.getBoolean("active") == false) throw Exception("이미 사용된 코드입니다.")
+            val boxId = codeSnap.getString("boxId") ?: throw Exception("boxId 없음")
+
+            // ✅ 기존 boxAliases 처리 (이미 read된 데이터 사용)
+            val existingAliases = userDoc.get("boxAliases") as? Map<String, String> ?: emptyMap()
+            val newAliases = existingAliases.toMutableMap()
+
+            if (alias.isNotEmpty()) {
+                newAliases[boxId] = alias
+            }
+
+            // ✅ 이제 모든 write 작업 실행
             // 코드 비활성화
             tx.update(codeRef, "active", false)
 
@@ -76,15 +90,11 @@ class RegisterBoxActivity : AppCompatActivity() {
                 SetOptions.merge()
             )
 
-            // 사용자 문서 갱신 (기존 alias 유지 + 새 alias 추가)
-            val userRef = db.collection("users").document(uid)
-            val userData = mutableMapOf<String, Any>(
-                "mainBoxId" to boxId
-            )
-            if (alias.isNotEmpty()) {
-                userData["boxAliases.$boxId"] = alias
-            }
-            tx.set(userRef, userData, SetOptions.merge())
+            // 사용자 정보 업데이트
+            tx.set(userRef, mapOf(
+                "mainBoxId" to boxId,
+                "boxAliases" to newAliases
+            ), SetOptions.merge())
 
             boxId
         }.addOnSuccessListener { boxId ->
@@ -117,13 +127,12 @@ class RegisterBoxActivity : AppCompatActivity() {
             )
         )
 
-        // 사용자 문서 갱신 (기존 alias 유지 + 새 alias 추가)
+        // ✅ 수정: boxAliases를 맵 형태로 저장
         val userRef = db.collection("users").document(uid)
-        val updateData = mapOf(
+        batch.set(userRef, mapOf(
             "mainBoxId" to boxId,
-            "boxAliases.$boxId" to alias
-        )
-        batch.set(userRef, updateData, SetOptions.merge())
+            "boxAliases" to mapOf(boxId to alias)  // 맵 형태로 저장
+        ), SetOptions.merge())
 
         batch.commit()
             .addOnSuccessListener {

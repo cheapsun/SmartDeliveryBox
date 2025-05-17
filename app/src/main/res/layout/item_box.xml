@@ -44,16 +44,38 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent">
 
-            <TextView
-                android:id="@+id/tvBoxAlias"
+            <!-- 박스 이름과 뱃지를 담는 컨테이너 -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="우리집 택배함"
-                android:textSize="18sp"
-                android:textColor="#1A1A1A"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tvBoxAlias"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="우리집 택배함"
+                    android:textSize="18sp"
+                    android:textColor="#1A1A1A"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end"/>
+
+                <!-- 메인 박스 표시 뱃지 -->
+                <TextView
+                    android:id="@+id/tvMainBoxBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="메인"
+                    android:textSize="12sp"
+                    android:textColor="@android:color/white"
+                    android:background="@drawable/bg_badge_main"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:layout_marginStart="8dp"
+                    android:visibility="gone" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/tvBoxInfo"
@@ -78,22 +100,6 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
             android:contentDescription="도어락 상태"/>
-
-        <!-- 메인 박스 표시 뱃지 추가 -->
-        <TextView
-            android:id="@+id/tvMainBoxBadge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="메인"
-            android:textSize="12sp"
-            android:textColor="@android:color/white"
-            android:background="@drawable/bg_badge_main"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="2dp"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            android:layout_margin="8dp" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>
