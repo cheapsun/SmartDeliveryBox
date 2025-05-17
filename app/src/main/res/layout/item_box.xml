@@ -60,7 +60,11 @@
                     android:textColor="#1A1A1A"
                     android:textStyle="bold"
                     android:maxLines="1"
-                    android:ellipsize="end"/>
+                    android:ellipsize="end"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="4dp" />
 
                 <!-- 메인 박스 표시 뱃지 -->
                 <TextView
@@ -74,7 +78,10 @@
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="2dp"
                     android:layout_marginStart="8dp"
-                    android:visibility="gone" />
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackgroundBorderless" />
             </LinearLayout>
 
             <TextView

@@ -16,7 +16,8 @@ import android.view.View
 
 class BoxListAdapter(
     private val boxList: List<BoxInfo>,
-    private val onItemClick: (BoxInfo) -> Unit
+    private val onItemClick: (BoxInfo) -> Unit,
+    private val onMainBoxToggle: ((BoxInfo, Boolean) -> Unit)? = null
 ) : RecyclerView.Adapter<BoxListAdapter.BoxViewHolder>() {
 
     // 메인 박스 ID를 저장할 속성 추가
@@ -25,8 +26,8 @@ class BoxListAdapter(
     // mainBoxId 업데이트 메소드 추가
     fun updateMainBoxId(boxId: String) {
         mainBoxId = boxId
-        // 데이터가 변경되었음을 알림 (옵션)
-        // notifyDataSetChanged()
+        // 데이터가 변경되었음을 알림
+        notifyDataSetChanged()
     }
 
     inner class BoxViewHolder(val binding: ItemBoxBinding) : RecyclerView.ViewHolder(binding.root) {
@@ -71,10 +72,20 @@ class BoxListAdapter(
 
                 // 제목 스타일 변경
                 if (isMainBox) {
-                    tvBoxAlias.setTextColor(ContextCompat.getColor(root.context, R.color.primary_blue))
+                    tvBoxAlias.setTextColor(
+                        ContextCompat.getColor(
+                            root.context,
+                            R.color.primary_blue
+                        )
+                    )
                     tvBoxAlias.setTypeface(null, Typeface.BOLD)
                 } else {
-                    tvBoxAlias.setTextColor(ContextCompat.getColor(root.context, R.color.text_primary))
+                    tvBoxAlias.setTextColor(
+                        ContextCompat.getColor(
+                            root.context,
+                            R.color.text_primary
+                        )
+                    )
                     tvBoxAlias.setTypeface(null, Typeface.NORMAL)
                 }
 
@@ -82,9 +93,21 @@ class BoxListAdapter(
                 root.setOnClickListener {
                     onItemClick(boxInfo)
                 }
+
+                // 메인 박스 뱃지 클릭 리스너 추가
+                tvMainBoxBadge.setOnClickListener {
+                    // 메인 박스 해제 (이미 메인이므로)
+                    onMainBoxToggle?.invoke(boxInfo, false)
+                }
+
+                // 박스 제목 영역 롱클릭으로 메인 박스 설정/해제
+                tvBoxAlias.setOnLongClickListener {
+                    onMainBoxToggle?.invoke(boxInfo, !isMainBox)
+                    true
+
+                }
             }
         }
-
         private fun getTimeAgoText(timestamp: Long): String {
             val now = System.currentTimeMillis()
             val diff = now - timestamp

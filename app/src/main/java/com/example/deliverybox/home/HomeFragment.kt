@@ -68,14 +68,21 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        adapter = BoxListAdapter(boxList) { boxInfo ->
-            val intent = Intent(requireContext(), BoxDetailActivity::class.java).apply {
-                putExtra("boxId", boxInfo.boxId)
-                putExtra("boxName", boxInfo.boxName)
-                putExtra("boxAlias", boxInfo.alias)
+        adapter = BoxListAdapter(
+            boxList = boxList,
+            onItemClick = { boxInfo ->
+                val intent = Intent(requireContext(), BoxDetailActivity::class.java).apply {
+                    putExtra("boxId", boxInfo.boxId)
+                    putExtra("boxName", boxInfo.boxName)
+                    putExtra("boxAlias", boxInfo.alias)
+                }
+                startActivity(intent)
+            },
+            onMainBoxToggle = { boxInfo, setAsMain ->
+                // 메인 박스 설정/해제 처리
+                handleMainBoxToggle(boxInfo, setAsMain)
             }
-            startActivity(intent)
-        }
+        )
 
         binding.recyclerViewBoxes.apply {
             layoutManager = LinearLayoutManager(requireContext())
@@ -96,6 +103,49 @@ class HomeFragment : Fragment() {
             registerBoxLauncher.launch(intent)
         }
         dialog.show(parentFragmentManager, "RegisterBoxMethodDialog")
+    }
+
+    /**
+     * 메인 박스 설정/해제 처리
+     */
+    private fun handleMainBoxToggle(boxInfo: BoxInfo, setAsMain: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+
+        // 현재 상태와 동일하면 처리하지 않음
+        val isCurrentlyMain = boxInfo.boxId == mainBoxId
+        if (setAsMain == isCurrentlyMain) {
+            return
+        }
+
+        val updateData = if (setAsMain) {
+            mapOf("mainBoxId" to boxInfo.boxId)
+        } else {
+            mapOf("mainBoxId" to "")  // 메인 박스 해제시 빈 문자열로 설정
+        }
+
+        db.collection("users").document(uid)
+            .update(updateData)
+            .addOnSuccessListener {
+                // 성공 시 로컬 상태 업데이트
+                mainBoxId = if (setAsMain) boxInfo.boxId else ""
+                adapter.updateMainBoxId(mainBoxId)
+
+                // 사용자에게 피드백
+                Toast.makeText(
+                    requireContext(),
+                    if (setAsMain) "${boxInfo.alias}이(가) 메인 택배함으로 설정되었습니다"
+                    else "메인 택배함 설정이 해제되었습니다",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            .addOnFailureListener { e ->
+                Log.e("HomeFragment", "메인 박스 설정 실패: ${e.message}")
+                Toast.makeText(
+                    requireContext(),
+                    "설정 변경 실패: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
     }
 
     private fun loadBoxList() {
@@ -123,7 +173,7 @@ class HomeFragment : Fragment() {
 
                 Log.d("HomeFragment", "사용자 문서 데이터: ${snapshot.data}")
 
-                // ✅ 단순화: 직접 맵으로 가져오기
+                // 단순화: 직접 맵으로 가져오기
                 val boxAliases = snapshot.get("boxAliases") as? Map<String, String> ?: emptyMap()
                 mainBoxId = snapshot.getString("mainBoxId") ?: ""
 
@@ -136,7 +186,7 @@ class HomeFragment : Fragment() {
                     return@addSnapshotListener
                 }
 
-                // ✅ 단순화: 직접 boxList에 추가하고 비동기로 세부 정보 업데이트
+                // 단순화: 직접 boxList에 추가하고 비동기로 세부 정보 업데이트
                 boxList.clear()
 
                 // 모든 박스를 기본 정보로 먼저 추가
@@ -155,12 +205,12 @@ class HomeFragment : Fragment() {
                 sortBoxList()
                 updateEmptyState(false)
 
-                // ✅ 단순화: 각 박스의 세부 정보를 비동기로 로드
+                // 각 박스의 세부 정보를 비동기로 로드
                 loadBoxDetails()
             }
     }
 
-    // ✅ 개선된 메서드: 박스 세부 정보 로드 (동시성 이슈 해결)
+    // 개선된 메서드: 박스 세부 정보 로드 (동시성 이슈 해결)
     private fun loadBoxDetails() {
         if (boxList.isEmpty()) return
 
@@ -240,7 +290,7 @@ class HomeFragment : Fragment() {
         }
     }
 
-    // ✅ 개선된 메서드: 패키지 수 로드 (동시성 이슈 해결)
+    // 개선된 메서드: 패키지 수 로드 (동시성 이슈 해결)
     private fun loadPackageCount(boxId: String, index: Int) {
         db.collection("boxes").document(boxId)
             .collection("packages")
@@ -267,7 +317,7 @@ class HomeFragment : Fragment() {
             }
     }
 
-    // ✅ 단순화된 정렬 메서드
+    // 단순화된 정렬 메서드
     private fun sortBoxList() {
         Log.d("HomeFragment", "박스 리스트 정렬 시작 - 총 ${boxList.size}개")
 
@@ -291,14 +341,14 @@ class HomeFragment : Fragment() {
         }
     }
 
-    // ✅ 새로운 메서드: 패키지 수 배치 로드 (성능 최적화)
+    // 새로운 메서드: 패키지 수 배치 로드 (성능 최적화)
     private fun loadPackageCountsBatch() {
         boxList.forEachIndexed { index, boxInfo ->
             loadPackageCount(boxInfo.boxId, index)
         }
     }
 
-    // ✅ 새로운 메서드: QrCodeValidationService를 사용한 박스 목록 로드
+    // 새로운 메서드: QrCodeValidationService를 사용한 박스 목록 로드
     private fun loadBoxListWithValidationService() {
         if (!isAdded || _binding == null) return
 
@@ -348,7 +398,7 @@ class HomeFragment : Fragment() {
         }
     }
 
-    // ✅ 새로운 메서드: 외부에서 호출 가능한 새로고침 (MainActivity에서 사용)
+    // 새로운 메서드: 외부에서 호출 가능한 새로고침 (MainActivity에서 사용)
     fun refreshBoxList() {
         if (!isAdded || _binding == null) return
 
@@ -358,7 +408,7 @@ class HomeFragment : Fragment() {
         loadBoxListWithValidationService()
     }
 
-    // ✅ 새로운 메서드: 빈 상태 확인 및 적절한 로딩 방식 선택
+    // 새로운 메서드: 빈 상태 확인 및 적절한 로딩 방식 선택
     private fun smartLoadBoxList() {
         if (boxList.isEmpty()) {
             // 빈 상태면 ValidationService로 빠른 로드
