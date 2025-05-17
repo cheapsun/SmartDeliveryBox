@@ -28,6 +28,10 @@
     <color name="gray_700">#616161</color>
     <color name="gray_900">#212121</color>
 
+    <!-- QR 배경 색상 -->
+    <color name="transparent_black">#80000000</color>
+    <color name="transparent_blue">#4000A8FF</color>
+
     <color name="red">#D32F2F</color>
     <color name="doorlock_icon_red">#FF4444</color>
     <color name="gray_tint">#CCCCCC</color>

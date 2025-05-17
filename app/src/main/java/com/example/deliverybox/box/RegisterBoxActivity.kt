@@ -23,6 +23,20 @@ class RegisterBoxActivity : AppCompatActivity() {
         binding = ActivityRegisterBoxBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // QR 코드로 전달된 경우 처리
+        val qrCode = intent.getStringExtra("qr_code")
+        val fromQrScan = intent.getBooleanExtra("from_qr_scan", false)
+
+        if (fromQrScan && !qrCode.isNullOrEmpty()) {
+            // QR 스캔으로 온 경우 코드 필드에 설정하고 별칭만 입력받도록
+            binding.etBoxCode.setText(qrCode)
+            binding.etBoxCode.isEnabled = false
+            binding.layoutBoxCode.hint = "택배함 코드 (QR 스캔됨)"
+
+            // 포커스를 별칭 입력 필드로 이동
+            binding.etBoxAlias.requestFocus()
+        }
+
         // 🔁 툴바 뒤로가기 버튼
         binding.toolbarRegisterBox.setNavigationOnClickListener {
             onBackPressedDispatcher.onBackPressed()

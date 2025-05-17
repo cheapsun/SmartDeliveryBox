@@ -1,20 +1,41 @@
 package com.example.deliverybox.dialog
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
+import com.example.deliverybox.box.QrScanActivity
+import com.example.deliverybox.box.RegisterBoxActivity
 import com.example.deliverybox.databinding.DialogRegisterBoxMethodBinding
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-
 
 class RegisterBoxMethodDialogFragment : BottomSheetDialogFragment() {
 
     private var _binding: DialogRegisterBoxMethodBinding? = null
     private val binding get() = _binding!!
 
-    // ✅ 리스너 선언 및 연결 메서드 포함
     private var listener: (() -> Unit)? = null
+
+    // QR 스캔 결과 처리
+    private val qrScanLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val qrCode = result.data?.getStringExtra(QrScanActivity.RESULT_QR_CODE)
+            qrCode?.let {
+                // QR 코드로 등록 액티비티 시작
+                val intent = Intent(requireContext(), RegisterBoxActivity::class.java).apply {
+                    putExtra("qr_code", it)
+                    putExtra("from_qr_scan", true)
+                }
+                startActivity(intent)
+                listener?.invoke()
+                dismiss()
+            }
+        }
+    }
 
     fun setOnRegisterBoxSelectedListener(listener: () -> Unit) {
         this.listener = listener
@@ -31,15 +52,15 @@ class RegisterBoxMethodDialogFragment : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 수동 등록 카드 클릭 시 리스너 실행 후 닫기
-        binding.cardManualRegister.setOnClickListener {
-            listener?.invoke()
-            dismiss()
+        // QR 스캔 카드 클릭
+        binding.cardQrRegister.setOnClickListener {
+            val intent = Intent(requireContext(), QrScanActivity::class.java)
+            qrScanLauncher.launch(intent)
         }
 
-        // QR 등록 카드 (추후 확장 가능)
-        binding.cardQrRegister.setOnClickListener {
-            // TODO: QR 등록 로직 추가 예정
+        // 수동 등록 카드 클릭
+        binding.cardManualRegister.setOnClickListener {
+            listener?.invoke()
             dismiss()
         }
 

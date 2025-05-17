@@ -60,7 +60,8 @@ dependencies {
     // WorkManager (코루틴 지원)
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     // ZXing 라이브러리(qr코드)
-    implementation("com.google.zxing:core:3.5.2")
+    implementation("com.google.zxing:core:3.3.0")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")

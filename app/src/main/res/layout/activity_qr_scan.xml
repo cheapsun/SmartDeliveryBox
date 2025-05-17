@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- 카메라 뷰 -->
+    <com.journeyapps.barcodescanner.DecoratedBarcodeView
+        android:id="@+id/zxing_barcode_scanner"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:zxing_scanner_layout="@layout/custom_barcode_scanner"
+        app:zxing_use_texture_view="true" />
+
+    <!-- 상단 툴바 -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/transparent_black"
+        app:navigationIcon="@drawable/ic_close_white"
+        app:title="QR 코드 스캔"
+        app:titleTextColor="@android:color/white"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 하단 컨트롤 영역 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:padding="24dp"
+        android:background="@color/transparent_black"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <!-- 수동 입력 버튼 -->
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_manual_input"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="수동 입력"
+            android:textColor="@android:color/white"
+            android:background="@drawable/button_outline_white"
+            android:layout_marginEnd="16dp" />
+
+        <!-- 플래시 토글 버튼 -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/btn_flash_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_flash_off"
+            app:backgroundTint="@color/primary_blue"
+            app:tint="@android:color/white"
+            android:layout_marginStart="16dp" />
+
+    </LinearLayout>
+
+    <!-- 스캔 가이드 오버레이 -->
+    <View
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:background="@drawable/qr_scan_overlay"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 안내 텍스트 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="택배함의 QR 코드를 스캔하세요"
+        android:textColor="@android:color/white"
+        android:textSize="16sp"
+        android:background="@color/transparent_black"
+        android:padding="12dp"
+        app:layout_constraintBottom_toTopOf="@id/zxing_barcode_scanner"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="120dp" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
