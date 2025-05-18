@@ -69,7 +69,7 @@ class PackageSwipeCallback(
             )
 
             // 체크 아이콘 그리기
-            drawIcon(c, itemView, R.drawable.ic_check, dX, true)
+            drawIcon(c, itemView, android.R.drawable.ic_menu_send, dX, true)
 
         } else if (dX < 0) {
             // 왼쪽 스와이프 - 삭제 (빨간색)
@@ -83,33 +83,37 @@ class PackageSwipeCallback(
             )
 
             // 삭제 아이콘 그리기
-            drawIcon(c, itemView, R.drawable.ic_delete, dX, false)
+            drawIcon(c, itemView, android.R.drawable.ic_menu_delete, dX, false)
         }
     }
 
     private fun drawIcon(canvas: Canvas, itemView: View, iconRes: Int, dX: Float, isRightSwipe: Boolean) {
-        val icon = ContextCompat.getDrawable(itemView.context, iconRes)
-        icon?.let {
-            val iconMargin = (itemView.height - it.intrinsicHeight) / 2
-            val iconTop = itemView.top + iconMargin
-            val iconBottom = iconTop + it.intrinsicHeight
+        try {
+            val icon = ContextCompat.getDrawable(itemView.context, iconRes)
+            icon?.let {
+                val iconMargin = (itemView.height - it.intrinsicHeight) / 2
+                val iconTop = itemView.top + iconMargin
+                val iconBottom = iconTop + it.intrinsicHeight
 
-            val iconLeft: Int
-            val iconRight: Int
+                val iconLeft: Int
+                val iconRight: Int
 
-            if (isRightSwipe) {
-                // 오른쪽 스와이프 - 왼쪽에 아이콘
-                iconLeft = itemView.left + iconMargin
-                iconRight = iconLeft + it.intrinsicWidth
-            } else {
-                // 왼쪽 스와이프 - 오른쪽에 아이콘
-                iconRight = itemView.right - iconMargin
-                iconLeft = iconRight - it.intrinsicWidth
+                if (isRightSwipe) {
+                    // 오른쪽 스와이프 - 왼쪽에 아이콘
+                    iconLeft = itemView.left + iconMargin
+                    iconRight = iconLeft + it.intrinsicWidth
+                } else {
+                    // 왼쪽 스와이프 - 오른쪽에 아이콘
+                    iconRight = itemView.right - iconMargin
+                    iconLeft = iconRight - it.intrinsicWidth
+                }
+
+                it.setBounds(iconLeft, iconTop, iconRight, iconBottom)
+                it.setTint(Color.WHITE)
+                it.draw(canvas)
             }
-
-            it.setBounds(iconLeft, iconTop, iconRight, iconBottom)
-            it.setTint(Color.WHITE)
-            it.draw(canvas)
+        } catch (e: Exception) {
+            // 아이콘을 찾을 수 없는 경우 무시하고 배경색만 표시
         }
     }
 }

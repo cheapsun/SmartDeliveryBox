@@ -1,126 +1,169 @@
 package com.example.deliverybox.delivery
 
+import android.content.Intent
 import android.os.Bundle
-import android.view.View
+import android.view.Menu
+import android.view.MenuItem
+import android.widget.Toast
+import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import com.example.deliverybox.R
-import com.example.deliverybox.databinding.ActivityPackageDetailBinding
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import androidx.lifecycle.observe
-import com.example.deliverybox.delivery.api.TrackingInfo
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class PackageDetailActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityPackageDetailBinding
-    private lateinit var viewModel: PackageDetailViewModel
-    private var packageId: String = ""
+    private val viewModel: PackageDetailViewModel by viewModels()
+
     private var boxId: String = ""
+    private var packageId: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityPackageDetailBinding.inflate(layoutInflater)
-        setContentView(binding.root)
 
-        packageId = intent.getStringExtra("packageId") ?: return
-        boxId = intent.getStringExtra("boxId") ?: return
+        // 임시 레이아웃 설정 (실제 레이아웃이 없을 때)
+        setContentView(android.R.layout.activity_list_item)
 
-        setupViews()
-        observeViewModel()
+        // Intent에서 데이터 추출
+        boxId = intent.getStringExtra("boxId") ?: ""
+        packageId = intent.getStringExtra("packageId") ?: ""
 
+        if (boxId.isEmpty() || packageId.isEmpty()) {
+            Toast.makeText(this, "잘못된 접근입니다.", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        setupActionBar()
+        setupObservers()
+
+        // 패키지 상세 정보 로드
         viewModel.loadPackageDetail(boxId, packageId)
     }
 
-    private fun setupViews() {
-        binding.toolbar.setNavigationOnClickListener { finish() }
-
-        binding.btnRefresh.setOnClickListener {
-            viewModel.refreshTrackingInfo()
-        }
-
-        binding.btnMarkAsReceived.setOnClickListener {
-            showReceiveConfirmDialog()
+    private fun setupActionBar() {
+        supportActionBar?.apply {
+            setDisplayHomeAsUpEnabled(true)
+            setDisplayShowHomeEnabled(true)
+            title = "택배 상세"
         }
     }
 
-    private fun observeViewModel() {
+    private fun setupObservers() {
+        // 패키지 정보 관찰
         viewModel.packageInfo.observe(this) { packageInfo ->
-            updatePackageInfo(packageInfo)
+            packageInfo?.let {
+                // TODO: UI 업데이트 (레이아웃 파일이 있을 때 구현)
+                supportActionBar?.subtitle = it.trackingNumber
+            }
         }
 
-        viewModel.trackingInfo.observe(this) { trackingInfo ->
-            updateTrackingInfo(trackingInfo)
-        }
-
+        // UI 상태 관찰
         viewModel.uiState.observe(this) { state ->
             when (state) {
-                is PackageDetailUiState.Loading -> showLoading(true)
-                is PackageDetailUiState.Success -> showLoading(false)
+                is PackageDetailUiState.Loading -> {
+                    // TODO: 로딩 표시
+                }
+                is PackageDetailUiState.Success -> {
+                    // TODO: 성공 처리
+                }
                 is PackageDetailUiState.Error -> {
-                    showLoading(false)
-                    showError(state.message)
+                    Toast.makeText(this, state.message, Toast.LENGTH_LONG).show()
+                }
+                is PackageDetailUiState.Idle -> {
+                    // TODO: 초기 상태 처리
                 }
             }
         }
-    }
 
-    private fun updatePackageInfo(packageInfo: PackageInfo) {
-        with(binding) {
-            tvTrackingNumber.text = packageInfo.trackingNumber
-            tvCourierCompany.text = packageInfo.courierCompany
-            tvItemName.text = packageInfo.itemName ?: "상품명 없음"
-            tvRegisteredDate.text = formatDate(packageInfo.registeredAt)
+        // 작업 결과 관찰
+        viewModel.operationResult.observe(this) { result ->
+            result?.let { (success, message) ->
+                Toast.makeText(this, message, if (success) Toast.LENGTH_SHORT else Toast.LENGTH_LONG).show()
 
-            // 상태 배지 업데이트
-            updateStatusBadge(packageInfo.status)
+                if (success) {
+                    when {
+                        message.contains("삭제") -> finish()
+                        message.contains("수령") -> {
+                            setResult(RESULT_OK)
+                            finish()
+                        }
+                    }
+                }
 
-            // 수령 확인 버튼 표시 여부
-            binding.btnMarkAsReceived.visibility = if (
-                packageInfo.status == DeliveryStatus.DELIVERED ||
-                packageInfo.status == DeliveryStatus.IN_BOX
-            ) {
-                View.VISIBLE
-            } else {
-                View.GONE
+                viewModel.clearOperationResult()
             }
         }
     }
 
-    private fun updateTrackingInfo(trackingInfo: TrackingInfo?) {
-        if (trackingInfo != null) {
-            binding.timelineView.setDeliverySteps(trackingInfo.deliverySteps, trackingInfo.currentStatus)
-            binding.tvLastUpdated.text = "마지막 업데이트: ${formatDateTime(trackingInfo.lastUpdated)}"
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.menu_package_detail, menu)
+        return true
+    }
 
-            // 예상 배송일 표시
-            trackingInfo.estimatedDelivery?.let { estimatedDate ->
-                binding.tvEstimatedDelivery.text = "예상 배송: ${formatDate(estimatedDate)}"
-                binding.tvEstimatedDelivery.visibility = View.VISIBLE
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                finish()
+                true
             }
+            R.id.action_edit -> {
+                // 편집 화면으로 이동
+                val intent = Intent(this, PackageEditActivity::class.java).apply {
+                    putExtra("boxId", boxId)
+                    putExtra("packageId", packageId)
+                }
+                startActivityForResult(intent, REQUEST_CODE_EDIT)
+                true
+            }
+            R.id.action_delete -> {
+                showDeleteConfirmDialog()
+                true
+            }
+            R.id.action_mark_received -> {
+                showReceiveConfirmDialog()
+                true
+            }
+            R.id.action_refresh -> {
+                viewModel.refreshTrackingInfo()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
 
-    private fun updateStatusBadge(status: DeliveryStatus) {
-        val (text, colorRes) = when (status) {
-            DeliveryStatus.REGISTERED -> "등록됨" to R.color.gray_500
-            DeliveryStatus.PICKED_UP -> "접수" to R.color.primary_blue
-            DeliveryStatus.IN_TRANSIT -> "배송중" to R.color.primary_blue
-            DeliveryStatus.OUT_FOR_DELIVERY -> "배송출발" to R.color.warning
-            DeliveryStatus.IN_BOX -> "보관중" to R.color.warning
-            DeliveryStatus.DELIVERED -> "배송완료" to R.color.success
-        }
-
-        binding.statusBadge.text = text
-        binding.statusBadge.setBackgroundColor(ContextCompat.getColor(this, colorRes))
+    private fun showDeleteConfirmDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("택배 삭제")
+            .setMessage("택배 정보를 삭제하시겠습니까?\n삭제된 정보는 복구할 수 없습니다.")
+            .setPositiveButton("삭제") { _, _ ->
+                viewModel.deletePackage()
+            }
+            .setNegativeButton("취소", null)
+            .show()
     }
 
     private fun showReceiveConfirmDialog() {
-        MaterialAlertDialogBuilder(this)
+        AlertDialog.Builder(this)
             .setTitle("수령 확인")
-            .setMessage("택배를 수령하셨습니까? 수령 확인 후에는 취소할 수 없습니다.")
-            .setPositiveButton("수령 확인") { _, _ ->
+            .setMessage("택배를 수령하셨습니까?\n수령 확인 후에는 취소할 수 없습니다.")
+            .setPositiveButton("수령 완료") { _, _ ->
                 viewModel.markAsReceived()
             }
             .setNegativeButton("취소", null)
             .show()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_CODE_EDIT && resultCode == RESULT_OK) {
+            // 편집 후 돌아왔을 때 정보 새로고침
+            viewModel.loadPackageDetail(boxId, packageId)
+        }
+    }
+
+    companion object {
+        private const val REQUEST_CODE_EDIT = 1001
     }
 }

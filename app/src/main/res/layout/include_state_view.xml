@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- 로딩 상태 -->
+    <ProgressBar
+        android:id="@+id/state_loading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+
+    <!-- 빈 화면 상태 -->
+    <LinearLayout
+        android:id="@+id/state_empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📦"
+            android:textSize="48sp"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/state_empty_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="등록된 택배가 없습니다"
+            android:textSize="16sp"
+            android:textColor="@color/gray_600"
+            android:gravity="center" />
+
+    </LinearLayout>
+
+    <!-- 오류 상태 -->
+    <LinearLayout
+        android:id="@+id/state_error"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚠️"
+            android:textSize="48sp"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/state_error_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="오류가 발생했습니다"
+            android:textSize="16sp"
+            android:textColor="@color/gray_600"
+            android:gravity="center"
+            android:layout_marginBottom="16dp" />
+
+        <Button
+            android:id="@+id/state_error_retry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="다시 시도"
+            style="@style/Widget.Material3.Button.OutlinedButton" />
+
+    </LinearLayout>
+
+</FrameLayout>

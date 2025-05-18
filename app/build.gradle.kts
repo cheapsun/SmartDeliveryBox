@@ -1,12 +1,19 @@
 plugins {
+    // 1. 안드로이드 플러그인을 먼저
     alias(libs.plugins.android.application)
+
+    // 2. 코틀린 플러그인
     alias(libs.plugins.kotlin.android)
 
-    id("com.google.gms.google-services")
-
+    // 3. 그 다음에 kotlin 관련 플러그인들
     id("kotlin-parcelize")
-
     id("kotlin-kapt")
+
+    // 4. Hilt 플러그인
+    id("com.google.dagger.hilt.android")
+
+    // 5. 기타 플러그인들
+    alias(libs.plugins.google.gms.google.services)
 }
 
 android {
@@ -61,6 +68,22 @@ dependencies {
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
+    // Hilt DI
+    implementation("com.google.dagger:hilt-android:2.48")
+    kapt("com.google.dagger:hilt-compiler:2.48")
+
+    // Hilt Worker
+    implementation ("androidx.hilt:hilt-work:1.0.0")
+    kapt ("androidx.hilt:hilt-compiler:1.0.0")
+
+    // WorkManager
+    implementation ("androidx.work:work-runtime-ktx:2.8.1")
+
+    // 이모지 호환성 라이브러리
+    implementation("androidx.emoji2:emoji2:1.4.0")
+    implementation("androidx.emoji2:emoji2-bundled:1.4.0")
+
 
     // 배송 조회 API
     implementation("com.squareup.retrofit2:retrofit:2.9.0")

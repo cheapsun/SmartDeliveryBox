@@ -9,10 +9,14 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.card.MaterialCardView
 import com.example.deliverybox.R
 import com.example.deliverybox.databinding.ItemPackageCardBinding
 import com.example.deliverybox.delivery.DeliveryStatus
 import com.example.deliverybox.delivery.PackageInfo
+import com.example.deliverybox.delivery.toKorean
+import com.example.deliverybox.delivery.getColorRes
+import com.example.deliverybox.delivery.getEmoji
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -22,16 +26,21 @@ class PackageAdapter(
     private val onDeleteClick: (PackageItem) -> Unit  // 삭제 콜백 추가
 ) : ListAdapter<PackageItem, PackageAdapter.PackageViewHolder>(PackageDiffCallback()) {
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PackageAdapter.PackageViewHolder {
+    companion object {
+        private const val MENU_ID_MARK_RECEIVED = 1001
+        private const val MENU_ID_MARK_IN_BOX = 1002
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PackageViewHolder {
         val binding = ItemPackageCardBinding.inflate(
             LayoutInflater.from(parent.context),
             parent,
             false
         )
-        return PackageAdapter.PackageViewHolder(binding, onItemClick, onStatusChange)
+        return PackageViewHolder(binding, onItemClick, onStatusChange)
     }
 
-    override fun onBindViewHolder(holder: PackageAdapter.PackageViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: PackageViewHolder, position: Int) {
         holder.bind(getItem(position))
     }
 
@@ -88,28 +97,22 @@ class PackageAdapter(
         }
 
         private fun updateStatusBadge(status: DeliveryStatus) {
-            val (text, colorRes, iconRes) = when (status) {
-                DeliveryStatus.REGISTERED -> Triple("등록", R.color.gray_500, R.drawable.ic_package)
-                DeliveryStatus.PICKED_UP -> Triple("접수", R.color.primary_blue, R.drawable.ic_picked_up)
-                DeliveryStatus.IN_TRANSIT -> Triple("배송중", R.color.primary_blue, R.drawable.ic_truck)
-                DeliveryStatus.OUT_FOR_DELIVERY -> Triple("배송출발", R.color.warning, R.drawable.ic_delivery)
-                DeliveryStatus.IN_BOX -> Triple("보관중", R.color.warning, R.drawable.ic_box)
-                DeliveryStatus.DELIVERED -> Triple("수령완료", R.color.success, R.drawable.ic_check_circle)
-            }
+            // PackageInfo.kt의 확장 함수들 활용
+            val text = status.toKorean()
+            val colorRes = status.getColorRes()
+            val emoji = status.getEmoji()
 
-            binding.tvStatusBadge.text = text
+            // 이모지와 텍스트 함께 표시
+            binding.tvStatusBadge.text = "$emoji $text"
             binding.tvStatusBadge.backgroundTintList = ColorStateList.valueOf(
                 ContextCompat.getColor(itemView.context, colorRes)
             )
 
-            binding.ivStatusIcon.setImageResource(iconRes)
-            binding.ivStatusIcon.setColorFilter(
-                ContextCompat.getColor(itemView.context, colorRes)
-            )
+            // 아이콘 대신 이모지만 사용하므로 아이콘 숨김
+            binding.ivStatusIcon.visibility = View.GONE
 
             // 접근성 설명
-            binding.ivStatusIcon.contentDescription = "상태 아이콘: $text"
-
+            binding.tvStatusBadge.contentDescription = "배송 상태: $emoji $text"
         }
 
         private fun updateProgressIndicator(status: DeliveryStatus) {
@@ -137,15 +140,18 @@ class PackageAdapter(
 
         private fun showQuickActionMenu(item: PackageItem) {
             val popup = PopupMenu(itemView.context, binding.btnQuickAction)
-            popup.menuInflater.inflate(R.menu.package_quick_actions, popup.menu)
+
+            // 프로그래매틱하게 메뉴 생성
+            popup.menu.add(0, MENU_ID_MARK_RECEIVED, 0, "✅ 수령 완료")
+            popup.menu.add(0, MENU_ID_MARK_IN_BOX, 1, "📮 보관함에 보관")
 
             popup.setOnMenuItemClickListener { menuItem ->
                 when (menuItem.itemId) {
-                    R.id.action_mark_received -> {
+                    MENU_ID_MARK_RECEIVED -> {
                         onStatusChange(item, DeliveryStatus.DELIVERED)
                         true
                     }
-                    R.id.action_mark_in_box -> {
+                    MENU_ID_MARK_IN_BOX -> {
                         onStatusChange(item, DeliveryStatus.IN_BOX)
                         true
                     }
@@ -183,9 +189,3 @@ class PackageDiffCallback : DiffUtil.ItemCallback<PackageItem>() {
         return oldItem == newItem
     }
 }
-
-// PackageItem 데이터 클래스
-data class PackageItem(
-    val id: String,
-    val data: PackageInfo
-)

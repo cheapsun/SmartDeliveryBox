@@ -25,12 +25,25 @@
     <color name="gray_200">#EEEEEE</color>
     <color name="gray_300">#E0E0E0</color>
     <color name="gray_500">#9E9E9E</color>
+    <color name="gray_600">#757575</color>
     <color name="gray_700">#616161</color>
+    <color name="gray_800">#424242</color>
     <color name="gray_900">#212121</color>
 
     <!-- QR 배경 색상 -->
     <color name="transparent_black">#80000000</color>
     <color name="transparent_blue">#4000A8FF</color>
+
+    <!-- Status badge background color -->
+    <color name="badge_stroke">#E0E0E0</color>
+    <color name="bg_status_badge">#4CAF50</color>
+
+    <!-- 추가 색상 옵션들 -->
+    <color name="bg_status_badge_success">#4CAF50</color>
+    <color name="bg_status_badge_warning">#FF9800</color>
+    <color name="bg_status_badge_error">#F44336</color>
+    <color name="bg_status_badge_info">#2196F3</color>
+    <color name="bg_status_badge_default">#9E9E9E</color>
 
     <!-- 새로 추가되는 색상들 -->
     <color name="main_box_background">#F3F6FF</color>

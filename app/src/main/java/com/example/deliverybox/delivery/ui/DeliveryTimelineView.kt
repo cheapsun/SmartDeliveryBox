@@ -1,9 +1,16 @@
 package com.example.deliverybox.delivery.ui
 
+import android.content.Context
+import android.graphics.*
+import android.util.AttributeSet
+import android.util.TypedValue
+import android.view.View
+import androidx.core.content.ContextCompat
+import com.example.deliverybox.R
 import com.example.deliverybox.delivery.DeliveryStatus
 import com.example.deliverybox.delivery.DeliveryStep
-import com.example.deliverybox.delivery.dp
-import com.example.deliverybox.delivery.sp
+import java.text.SimpleDateFormat
+import java.util.*
 
 class DeliveryTimelineView @JvmOverloads constructor(
     context: Context,
@@ -14,15 +21,22 @@ class DeliveryTimelineView @JvmOverloads constructor(
     private var deliverySteps: List<DeliveryStep> = emptyList()
     private var currentStatus: DeliveryStatus = DeliveryStatus.REGISTERED
 
+    // dp, sp 확장 속성 정의
+    private val Float.dp: Float
+        get() = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, this, context.resources.displayMetrics)
+
+    private val Float.sp: Float
+        get() = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, this, context.resources.displayMetrics)
+
     // Paint 객체들
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        strokeWidth = 4.dp
+        strokeWidth = 4f.dp
         style = Paint.Style.STROKE
     }
 
     private val completedLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = ContextCompat.getColor(context, R.color.primary_blue)
-        strokeWidth = 4.dp
+        strokeWidth = 4f.dp
         style = Paint.Style.STROKE
     }
 
@@ -31,35 +45,35 @@ class DeliveryTimelineView @JvmOverloads constructor(
     }
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 14.sp
+        textSize = 14f.sp
         textAlign = Paint.Align.CENTER
         typeface = Typeface.DEFAULT
     }
 
     private val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 12.sp
+        textSize = 12f.sp
         textAlign = Paint.Align.CENTER
         color = ContextCompat.getColor(context, R.color.text_secondary)
     }
 
     private val descriptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 13.sp
-        textAlign = Paint.Align.START
+        textSize = 13f.sp
+        textAlign = Paint.Align.LEFT
     }
 
     // 상수
-    private val circleRadius = 16.dp
-    private val lineMargin = 8.dp
-    private val textMargin = 12.dp
-    private val stepVerticalSpacing = 80.dp
+    private val circleRadius = 16f.dp
+    private val lineMargin = 8f.dp
+    private val textMargin = 12f.dp
+    private val stepVerticalSpacing = 80f.dp
 
-    // 단계별 정보
+    // 단계별 정보 (기본 안드로이드 아이콘 사용)
     private val stepInfo = listOf(
-        StepInfo("ORDER_PLACED", "접수", R.drawable.ic_receipt),
-        StepInfo("PICKED_UP", "상차", R.drawable.ic_pickup),
-        StepInfo("IN_TRANSIT", "이동중", R.drawable.ic_truck),
-        StepInfo("OUT_FOR_DELIVERY", "배송출발", R.drawable.ic_delivery),
-        StepInfo("DELIVERED", "배송완료", R.drawable.ic_delivered)
+        StepInfo("ORDER_PLACED", "접수", android.R.drawable.ic_menu_agenda),
+        StepInfo("PICKED_UP", "상차", android.R.drawable.ic_menu_save),
+        StepInfo("IN_TRANSIT", "이동중", android.R.drawable.ic_menu_directions),
+        StepInfo("OUT_FOR_DELIVERY", "배송출발", android.R.drawable.ic_menu_send),
+        StepInfo("DELIVERED", "배송완료", android.R.drawable.ic_menu_info_details)
     )
 
     data class StepInfo(val type: String, val title: String, val iconRes: Int)
@@ -75,8 +89,8 @@ class DeliveryTimelineView @JvmOverloads constructor(
 
         if (stepInfo.isEmpty()) return
 
-        val startX = circleRadius + 20.dp
-        var currentY = circleRadius + 20.dp
+        val startX = circleRadius + 20f.dp
+        var currentY = circleRadius + 20f.dp
 
         stepInfo.forEachIndexed { index, stepInfo ->
             val step = findStepByType(stepInfo.type)
@@ -138,11 +152,11 @@ class DeliveryTimelineView @JvmOverloads constructor(
             else -> ContextCompat.getColor(context, R.color.text_secondary)
         }
 
-        textPaint.textAlign = Paint.Align.START
+        textPaint.textAlign = Paint.Align.LEFT
         canvas.drawText(
             stepInfo.title,
             centerX + circleRadius + textMargin,
-            centerY - 5.dp,
+            centerY - 5f.dp,
             textPaint
         )
 
@@ -153,7 +167,7 @@ class DeliveryTimelineView @JvmOverloads constructor(
             canvas.drawText(
                 timeText,
                 centerX + circleRadius + textMargin,
-                centerY + 15.dp,
+                centerY + 15f.dp,
                 timePaint
             )
 
@@ -171,7 +185,7 @@ class DeliveryTimelineView @JvmOverloads constructor(
                 canvas.drawText(
                     description,
                     centerX + circleRadius + textMargin,
-                    centerY + 35.dp,
+                    centerY + 35f.dp,
                     descriptionPaint
                 )
             }
@@ -181,7 +195,7 @@ class DeliveryTimelineView @JvmOverloads constructor(
     private fun drawCheckMark(canvas: Canvas, centerX: Float, centerY: Float) {
         val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            strokeWidth = 3.dp
+            strokeWidth = 3f.dp
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
         }
@@ -196,21 +210,25 @@ class DeliveryTimelineView @JvmOverloads constructor(
     }
 
     private fun drawIcon(canvas: Canvas, centerX: Float, centerY: Float, iconRes: Int, isActive: Boolean) {
-        val drawable = ContextCompat.getDrawable(context, iconRes)
-        drawable?.let {
-            val halfSize = (circleRadius * 0.6f).toInt()
-            it.setBounds(
-                (centerX - halfSize).toInt(),
-                (centerY - halfSize).toInt(),
-                (centerX + halfSize).toInt(),
-                (centerY + halfSize).toInt()
-            )
+        try {
+            val drawable = ContextCompat.getDrawable(context, iconRes)
+            drawable?.let {
+                val halfSize = (circleRadius * 0.6f).toInt()
+                it.setBounds(
+                    (centerX - halfSize).toInt(),
+                    (centerY - halfSize).toInt(),
+                    (centerX + halfSize).toInt(),
+                    (centerY + halfSize).toInt()
+                )
 
-            it.setTint(
-                if (isActive) Color.WHITE
-                else ContextCompat.getColor(context, R.color.text_secondary)
-            )
-            it.draw(canvas)
+                it.setTint(
+                    if (isActive) Color.WHITE
+                    else ContextCompat.getColor(context, R.color.text_secondary)
+                )
+                it.draw(canvas)
+            }
+        } catch (e: Exception) {
+            // 아이콘을 찾을 수 없는 경우 무시
         }
     }
 
@@ -242,7 +260,7 @@ class DeliveryTimelineView @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredHeight = (stepInfo.size * stepVerticalSpacing + circleRadius * 2 + 40.dp).toInt()
+        val desiredHeight = (stepInfo.size * stepVerticalSpacing + circleRadius * 2 + 40f.dp).toInt()
         val height = resolveSize(desiredHeight, heightMeasureSpec)
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), height)
     }

@@ -2,26 +2,34 @@ package com.example.deliverybox.delivery
 
 import android.content.Context
 import android.util.Log
+import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.example.deliverybox.delivery.api.DeliveryTrackerService
+import com.example.deliverybox.domain.repositories.PackageRepository
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
 
-
-class PackageUpdateWorker(
-    context: Context,
-    params: WorkerParameters
+@HiltWorker
+class PackageUpdateWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val packageRepository: PackageRepository,
+    private val trackingService: DeliveryTrackerService,
+    private val notificationManager: PackageNotificationManager
 ) : CoroutineWorker(context, params) {
-
-    private val packageRepository by lazy { PackageRepositoryImpl() }
-    private val trackingService by lazy { DeliveryTrackerService() }
-    private val notificationManager by lazy { PackageNotificationManager(context) }
 
     override suspend fun doWork(): Result {
         return try {
             Log.d("PackageUpdateWorker", "배송 상태 업데이트 시작")
 
+            val boxId = inputData.getString("boxId") ?: run {
+                Log.e("PackageUpdateWorker", "boxId가 제공되지 않았습니다")
+                return Result.failure()
+            }
+
             // 1. 진행 중인 모든 패키지 조회
-            val activePackages = packageRepository.getActivePackages()
+            val activePackages = packageRepository.getActivePackages(boxId)
             Log.d("PackageUpdateWorker", "업데이트 대상 패키지: ${activePackages.size}개")
 
             // 2. 각 패키지 상태 확인 및 업데이트
@@ -65,7 +73,7 @@ class PackageUpdateWorker(
                     )
 
                     // DB 업데이트
-                    packageRepository.updatePackage(packageInfo.boxId, updatedPackage)
+                    packageRepository.updatePackage(updatedPackage)
 
                     // 알림 전송
                     notificationManager.sendStatusUpdateNotification(updatedPackage)
@@ -86,18 +94,21 @@ class PackageUpdateWorker(
 // 워커 스케줄링
 object PackageUpdateScheduler {
 
-    fun schedulePeriodicUpdates(context: Context) {
+    fun schedulePeriodicUpdates(context: Context, boxId: String) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .setRequiresBatteryNotLow(true)
             .build()
+
+        val inputData = workDataOf("boxId" to boxId)
 
         val updateRequest = PeriodicWorkRequestBuilder<PackageUpdateWorker>(
             repeatInterval = 2, // 2시간마다
             repeatIntervalTimeUnit = TimeUnit.HOURS
         )
             .setConstraints(constraints)
-            .setInitialDelay(30, TimeUnit.MINUTES) // 앱 시작 30분 후
+            .setInitialDelay(30, TimeUnit.MINUTES)
+            .setInputData(inputData)
             .addTag("package_update")
             .build()
 
@@ -109,13 +120,16 @@ object PackageUpdateScheduler {
             )
     }
 
-    fun scheduleImmediateUpdate(context: Context) {
+    fun scheduleImmediateUpdate(context: Context, boxId: String) {
+        val inputData = workDataOf("boxId" to boxId)
+
         val updateRequest = OneTimeWorkRequestBuilder<PackageUpdateWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build()
             )
+            .setInputData(inputData)
             .addTag("immediate_update")
             .build()
 

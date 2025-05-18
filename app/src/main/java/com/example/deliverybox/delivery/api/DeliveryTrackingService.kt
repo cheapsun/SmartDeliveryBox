@@ -2,12 +2,12 @@ package com.example.deliverybox.delivery.api
 
 import com.example.deliverybox.delivery.DeliveryStatus
 import com.example.deliverybox.delivery.DeliveryStep
+import com.example.deliverybox.delivery.TrackingInfo
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.Response
-
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -17,7 +17,7 @@ interface DeliveryTrackingService {
 }
 
 class DeliveryTrackerService(
-    private val apiKey: String = BuildConfig.DELIVERY_TRACKER_API_KEY
+    private val apiKey: String = "" // ✅ BuildConfig 대신 기본값 설정
 ) : DeliveryTrackingService {
 
     private val retrofit = Retrofit.Builder()
@@ -66,10 +66,21 @@ class DeliveryTrackerService(
         }
     }
 
+    override suspend fun getSupportedCouriers(): List<CourierInfo> {
+        return COURIER_CODES.map { (name, code) ->
+            CourierInfo(
+                code = code,
+                name = name,
+                isSupported = true
+            )
+        }
+    }
+
     private fun mapToTrackingInfo(apiResponse: DeliveryApiResponse): TrackingInfo {
         // 배송 단계 변환
         val steps = apiResponse.progresses?.map { progress ->
             DeliveryStep(
+                id = "step_${progress.hashCode()}", // ✅ id 추가
                 stepType = mapStatusToStepType(progress.status?.text ?: ""),
                 description = progress.description ?: "",
                 location = buildLocationString(progress.location),
@@ -81,24 +92,23 @@ class DeliveryTrackerService(
         val currentStatus = determineCurrentStatus(steps)
 
         return TrackingInfo(
-            trackingNumber = apiResponse.trackingNumber ?: "",
-            courierCompany = apiResponse.carrier?.name ?: "",
             currentStatus = currentStatus,
             deliverySteps = steps,
+            lastUpdated = System.currentTimeMillis(),
             estimatedDelivery = apiResponse.estimatedDelivery?.let { parseDateTime(it) },
-            lastUpdated = System.currentTimeMillis()
+            trackingUrl = null // ✅ 기본값 설정
         )
     }
 
     // 상태 텍스트를 열거형으로 변환
     private fun mapStatusToStepType(status: String): String {
         return when {
-            status.contains("접수") || status.contains("운송장 발급") -> "ORDER_PLACED"
+            status.contains("접수") || status.contains("운송장 발급") -> "REGISTERED"
             status.contains("상차") || status.contains("수거") -> "PICKED_UP"
             status.contains("간선상차") || status.contains("이동중") -> "IN_TRANSIT"
             status.contains("배달출발") || status.contains("배송출발") -> "OUT_FOR_DELIVERY"
             status.contains("배달완료") || status.contains("배송완료") -> "DELIVERED"
-            else -> "UNKNOWN"
+            else -> "REGISTERED"
         }
     }
 
@@ -108,7 +118,7 @@ class DeliveryTrackerService(
 
         val latestStep = steps.maxByOrNull { it.timestamp }
         return when (latestStep?.stepType) {
-            "ORDER_PLACED" -> DeliveryStatus.PICKED_UP
+            "REGISTERED" -> DeliveryStatus.REGISTERED
             "PICKED_UP" -> DeliveryStatus.PICKED_UP
             "IN_TRANSIT" -> DeliveryStatus.IN_TRANSIT
             "OUT_FOR_DELIVERY" -> DeliveryStatus.OUT_FOR_DELIVERY
@@ -148,3 +158,40 @@ interface DeliveryTrackerApi {
         @Path("trackId") trackId: String
     ): Response<DeliveryApiResponse>
 }
+
+// ✅ 응답 데이터 클래스들
+data class DeliveryApiResponse(
+    val trackingNumber: String?,
+    val carrier: CarrierInfo?,
+    val progresses: List<ProgressInfo>?,
+    val estimatedDelivery: String?
+)
+
+data class CarrierInfo(
+    val id: String?,
+    val name: String?,
+    val tel: String?
+)
+
+data class ProgressInfo(
+    val time: String?,
+    val status: StatusInfo?,
+    val description: String?,
+    val location: LocationInfo?
+)
+
+data class StatusInfo(
+    val id: String?,
+    val text: String?
+)
+
+data class LocationInfo(
+    val name: String?,
+    val detail: String?
+)
+
+data class CourierInfo(
+    val code: String,
+    val name: String,
+    val isSupported: Boolean
+)

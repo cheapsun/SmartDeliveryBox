@@ -64,7 +64,10 @@ class PackageListActivity : AppCompatActivity() {
                 for (document in result) {
                     val pkg = document.toObject(Package::class.java)
                     val id = document.id
-                    packageList.add(PackageItem(id, pkg))
+
+                    // Package를 PackageInfo로 변환 ✅
+                    val packageInfo = convertToPackageInfo(pkg, id)
+                    packageList.add(PackageItem(id, packageInfo))
                 }
 
                 if (packageList.isEmpty()) {
@@ -74,14 +77,25 @@ class PackageListActivity : AppCompatActivity() {
                     emptyMessage.visibility = View.GONE
                     recyclerView.visibility = View.VISIBLE
 
-                    adapter = PackageAdapter(packageList.toList()) { selectedItem ->
-                        val intent = Intent(this, PackageEditActivity::class.java).apply {
-                            putExtra("boxId", boxId)
-                            putExtra("packageId", selectedItem.id)
+                    adapter = PackageAdapter(
+                        onItemClick = { selectedItem ->
+                            val intent = Intent(this, PackageEditActivity::class.java).apply {
+                                putExtra("boxId", boxId)
+                                putExtra("packageId", selectedItem.id)
+                            }
+                            editLauncher.launch(intent)
+                        },
+                        onStatusChange = { packageItem, newStatus ->
+                            // 상태 변경 로직 (선택사항)
+                            updatePackageStatus(packageItem.id, newStatus)
+                        },
+                        onDeleteClick = { packageItem ->
+                            // 삭제 로직 (선택사항)
+                            deletePackage(packageItem.id)
                         }
-                        editLauncher.launch(intent)
-                    }
+                    )
 
+                    adapter.submitList(packageList.toList()) // ✅ submitList 사용
                     recyclerView.adapter = adapter
                 }
             }
@@ -90,6 +104,65 @@ class PackageListActivity : AppCompatActivity() {
                 emptyMessage.text = "데이터를 불러올 수 없습니다."
                 emptyMessage.visibility = View.VISIBLE
                 recyclerView.visibility = View.GONE
+            }
+    }
+
+    /**
+     * Package 객체를 PackageInfo 객체로 변환
+     */
+    private fun convertToPackageInfo(pkg: Package, documentId: String): PackageInfo {
+        return PackageInfo(
+            id = documentId,
+            trackingNumber = pkg.trackingNumber,
+            courierCompany = pkg.courierCompany,
+            itemName = pkg.info.takeIf { it.isNotEmpty() }, // info를 itemName으로 매핑
+            category = pkg.category,
+            memo = null, // Package에는 memo 필드가 없음
+            origin = pkg.origin,
+            destination = "", // Package에는 destination 필드가 없음
+            status = DeliveryStatus.REGISTERED, // 기본값 설정
+            deliverySteps = emptyList(), // 기본값
+            registeredAt = pkg.createdAt,
+            registeredBy = pkg.registeredBy,
+            boxId = boxId,
+            lastUpdated = pkg.createdAt,
+            isDelivered = false, // 기본값
+            deliveredAt = null,
+            estimatedDelivery = null,
+            isAutoDetected = false, // 기본값
+            confidence = 1.0f // 기본값
+        )
+    }
+
+    /**
+     * 패키지 상태 업데이트 (선택사항)
+     */
+    private fun updatePackageStatus(packageId: String, newStatus: DeliveryStatus) {
+        db.collection("boxes").document(boxId)
+            .collection("packages").document(packageId)
+            .update("status", newStatus.name)
+            .addOnSuccessListener {
+                Log.d("PackageList", "상태 업데이트 성공: $newStatus")
+                loadPackages() // 새로고침
+            }
+            .addOnFailureListener { e ->
+                Log.e("PackageList", "상태 업데이트 실패: ${e.message}")
+            }
+    }
+
+    /**
+     * 패키지 삭제 (선택사항)
+     */
+    private fun deletePackage(packageId: String) {
+        db.collection("boxes").document(boxId)
+            .collection("packages").document(packageId)
+            .update("valid", false) // 소프트 삭제
+            .addOnSuccessListener {
+                Log.d("PackageList", "패키지 삭제 성공")
+                loadPackages() // 새로고침
+            }
+            .addOnFailureListener { e ->
+                Log.e("PackageList", "패키지 삭제 실패: ${e.message}")
             }
     }
 }

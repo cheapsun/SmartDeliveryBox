@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Parcelable
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import kotlinx.parcelize.Parcelize  // ✅ 추가된 import
 
 class PackageNotificationListener : NotificationListenerService() {
 
@@ -126,6 +127,7 @@ class PackageNotificationListener : NotificationListenerService() {
     }
 }
 
+@Parcelize  // ✅ 애노테이션 추가
 data class ExtractedPackageInfo(
     val trackingNumber: String,
     val courierCompany: String,

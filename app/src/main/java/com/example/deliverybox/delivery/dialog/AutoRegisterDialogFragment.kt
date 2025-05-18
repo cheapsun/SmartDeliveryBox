@@ -5,9 +5,9 @@ import android.os.Bundle
 import android.view.View
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
+import com.example.deliverybox.R
 import com.example.deliverybox.databinding.DialogAutoRegisterBinding
 import com.example.deliverybox.delivery.ExtractedPackageInfo
-import com.example.deliverybox.delivery.PackageFragment
 import com.example.deliverybox.delivery.PackageInfo
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
@@ -15,13 +15,18 @@ class AutoRegisterDialogFragment : DialogFragment() {
 
     private lateinit var binding: DialogAutoRegisterBinding
     private lateinit var extractedInfo: ExtractedPackageInfo
+    private var onPackageRegister: ((PackageInfo) -> Unit)? = null
 
     companion object {
-        fun newInstance(packageInfo: ExtractedPackageInfo): AutoRegisterDialogFragment {
+        fun newInstance(
+            packageInfo: ExtractedPackageInfo,
+            onRegister: (PackageInfo) -> Unit
+        ): AutoRegisterDialogFragment {
             return AutoRegisterDialogFragment().apply {
                 arguments = Bundle().apply {
                     putParcelable("package_info", packageInfo)
                 }
+                onPackageRegister = onRegister
             }
         }
     }
@@ -86,8 +91,8 @@ class AutoRegisterDialogFragment : DialogFragment() {
             confidence = extractedInfo.confidence
         )
 
-        // ViewModel로 등록 요청
-        (parentFragment as? PackageFragment)?.viewModel?.registerPackage(packageInfo)
+        // 콜백을 통해 패키지 등록 요청
+        onPackageRegister?.invoke(packageInfo)
         dismiss()
     }
 }

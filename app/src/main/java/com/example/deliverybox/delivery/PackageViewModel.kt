@@ -48,7 +48,7 @@ class PackageViewModel @Inject constructor(
     // 상태 변경
     fun updateStatus(boxId: String, packageId: String, status: DeliveryStatus) {
         viewModelScope.launch {
-            repository.updatePackageStatus(boxId, packageId, status.name)
+            repository.updatePackageStatus(boxId, packageId, status)
             loadPackages(boxId)
         }
     }
@@ -82,4 +82,3 @@ class PackageViewModel @Inject constructor(
                             (item.itemName?.contains(currentQuery, ignoreCase = true) == true))
         }
 }
-

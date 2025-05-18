@@ -3,8 +3,8 @@ package com.example.deliverybox.delivery
 import android.content.Intent
 import android.os.Bundle
 import android.view.*
-import android.widget.SearchView
 import android.widget.Button
+import androidx.appcompat.widget.SearchView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -12,9 +12,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.deliverybox.databinding.FragmentPackageBinding
 import com.example.deliverybox.delivery.adapter.PackageAdapter
 import com.example.deliverybox.delivery.adapter.PackageItem
-import com.example.deliverybox.delivery.dialog.FilterDialogFragment
 import com.example.deliverybox.delivery.swipe.PackageSwipeCallback
-import com.example.deliverybox.ui.StateViewHelper
+import utils.StateViewHelper
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class PackageFragment : Fragment() {
@@ -23,7 +22,7 @@ class PackageFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var viewModel: PackageViewModel
-    private lateinit var adapter: PackageAdapter
+    private lateinit var packageAdapter: PackageAdapter
 
     private var allItems: List<PackageItem> = emptyList()
 
@@ -41,11 +40,11 @@ class PackageFragment : Fragment() {
         setupRecyclerView()
         observeViewModel()
         setupSearchView()
-        viewModel.load(getCurrentBoxId()) // ✅ boxId 로드
+        viewModel.loadPackages(getCurrentBoxId())
     }
 
     private fun setupRecyclerView() {
-        adapter = PackageAdapter(
+        packageAdapter = PackageAdapter(
             onItemClick = { packageItem ->
                 val intent = Intent(requireContext(), PackageDetailActivity::class.java).apply {
                     putExtra("packageId", packageItem.id)
@@ -54,7 +53,7 @@ class PackageFragment : Fragment() {
                 startActivity(intent)
             },
             onStatusChange = { packageItem, newStatus ->
-                viewModel.updatePackageStatus(packageItem.id, newStatus)
+                viewModel.updateStatus(getCurrentBoxId(), packageItem.id, newStatus)
             },
             onDeleteClick = { packageItem ->
                 showDeleteConfirmDialog(packageItem)
@@ -63,32 +62,39 @@ class PackageFragment : Fragment() {
 
         binding.recyclerViewPackages.apply {
             layoutManager = LinearLayoutManager(requireContext())
-            adapter = this@PackageFragment.adapter
-            ItemTouchHelper(PackageSwipeCallback(adapter)).attachToRecyclerView(this)
+            adapter = packageAdapter
+            ItemTouchHelper(PackageSwipeCallback(packageAdapter)).attachToRecyclerView(this)
         }
 
         binding.swipeRefreshLayout.setOnRefreshListener {
-            viewModel.refreshPackages()
+            viewModel.loadPackages(getCurrentBoxId())
         }
     }
 
     private fun observeViewModel() {
         viewModel.uiState.observe(viewLifecycleOwner) { state ->
             when (state) {
-                is PackageViewModel.PackageUiState.Loading -> StateViewHelper.showLoading(binding.includeStateView)
-                is PackageViewModel.PackageUiState.Empty -> StateViewHelper.showEmpty(binding.includeStateView)
-                is PackageViewModel.PackageUiState.Error -> StateViewHelper.showError(binding.includeStateView, state.message)
-                is PackageViewModel.PackageUiState.Success -> {
-                    allItems = state.list
-                    adapter.submitList(state.list)
-                    StateViewHelper.hideAll(binding.includeStateView)
+                is PackageViewModel.UiState.Loading -> StateViewHelper.showLoading(binding.includeStateView.root)
+                is PackageViewModel.UiState.Empty -> StateViewHelper.showEmpty(binding.includeStateView.root)
+                is PackageViewModel.UiState.Error -> StateViewHelper.showError(binding.includeStateView.root, state.message)
+                is PackageViewModel.UiState.Success -> {
+                    // PackageInfo를 PackageItem으로 변환
+                    allItems = state.packages.map { packageInfo ->
+                        PackageItem(
+                            id = packageInfo.id,
+                            data = packageInfo
+                        )
+                    }
+                    packageAdapter.submitList(allItems)
+                    StateViewHelper.hideAll(binding.includeStateView.root)
                 }
             }
 
             binding.swipeRefreshLayout.isRefreshing = false
 
-            binding.includeStateView.findViewById<Button>(com.example.deliverybox.R.id.state_error_retry)?.setOnClickListener {
-                viewModel.refreshPackages()
+            // 바인딩을 통한 직접 접근으로 변경
+            binding.includeStateView.stateErrorRetry?.setOnClickListener {
+                viewModel.loadPackages(getCurrentBoxId())
             }
         }
     }
@@ -98,22 +104,21 @@ class PackageFragment : Fragment() {
             override fun onQueryTextSubmit(query: String?): Boolean = true
             override fun onQueryTextChange(newText: String?): Boolean {
                 val keyword = newText.orEmpty()
-                val filtered = allItems.filter {
-                    it.data.trackingNumber.contains(keyword, ignoreCase = true) ||
-                            it.data.itemName?.contains(keyword, ignoreCase = true) == true
-                }
-                adapter.submitList(filtered)
+                viewModel.search(keyword, getCurrentBoxId())
                 return true
             }
         })
     }
 
+    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
+        inflater.inflate(com.example.deliverybox.R.menu.menu_package_fragment, menu)
+        super.onCreateOptionsMenu(menu, inflater)
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             com.example.deliverybox.R.id.action_filter -> {
-                FilterDialogFragment { selectedStatus ->
-                    applyStatusFilter(selectedStatus)
-                }.show(childFragmentManager, "FilterDialog")
+                showFilterDialog()  // ✅ 별도 메서드 호출
                 true
             }
             com.example.deliverybox.R.id.action_search -> {
@@ -125,13 +130,38 @@ class PackageFragment : Fragment() {
         }
     }
 
+    private fun showFilterDialog() {
+        val statusOptions = arrayOf(
+            "전체",
+            DeliveryStatus.REGISTERED.toKorean(),
+            DeliveryStatus.PICKED_UP.toKorean(),
+            DeliveryStatus.IN_TRANSIT.toKorean(),
+            DeliveryStatus.OUT_FOR_DELIVERY.toKorean(),
+            DeliveryStatus.IN_BOX.toKorean(),
+            DeliveryStatus.DELIVERED.toKorean()
+        )
+
+        val statusValues = arrayOf(
+            null,
+            DeliveryStatus.REGISTERED,
+            DeliveryStatus.PICKED_UP,
+            DeliveryStatus.IN_TRANSIT,
+            DeliveryStatus.OUT_FOR_DELIVERY,
+            DeliveryStatus.IN_BOX,
+            DeliveryStatus.DELIVERED
+        )
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("상태별 필터")
+            .setItems(statusOptions) { _, which ->
+                applyStatusFilter(statusValues[which])
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
     private fun applyStatusFilter(status: DeliveryStatus?) {
-        val filtered = if (status == null) {
-            allItems
-        } else {
-            allItems.filter { it.data.status == status }
-        }
-        adapter.submitList(filtered)
+        viewModel.filter(status, getCurrentBoxId())
     }
 
     private fun showDeleteConfirmDialog(packageItem: PackageItem) {
@@ -139,13 +169,13 @@ class PackageFragment : Fragment() {
             .setTitle("택배 삭제")
             .setMessage("'${packageItem.data.trackingNumber}' 택배를 삭제하시겠습니까?")
             .setPositiveButton("삭제") { _, _ ->
-                viewModel.deletePackage(packageItem.id)
+                viewModel.deletePackage(getCurrentBoxId(), packageItem.id)
             }
             .setNegativeButton("취소") { _, _ ->
-                adapter.notifyItemChanged(adapter.currentList.indexOf(packageItem))
+                packageAdapter.notifyItemChanged(packageAdapter.currentList.indexOf(packageItem))
             }
             .setOnCancelListener {
-                adapter.notifyItemChanged(adapter.currentList.indexOf(packageItem))
+                packageAdapter.notifyItemChanged(packageAdapter.currentList.indexOf(packageItem))
             }
             .show()
     }

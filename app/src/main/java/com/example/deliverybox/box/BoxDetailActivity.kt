@@ -23,6 +23,8 @@ import androidx.appcompat.app.AlertDialog
 import android.view.Menu
 import android.view.MenuItem
 import com.example.deliverybox.R
+import com.example.deliverybox.delivery.DeliveryStatus
+import com.example.deliverybox.delivery.PackageInfo
 
 class BoxDetailActivity : AppCompatActivity() {
 
@@ -38,7 +40,7 @@ class BoxDetailActivity : AppCompatActivity() {
     private lateinit var packageAdapter: PackageAdapter
     private lateinit var logAdapter: LogAdapter
 
-    private val packagesList = mutableListOf<PackageItem>()
+    private var currentPackagesList = emptyList<PackageItem>()
     private val logsList = mutableListOf<LogItem>()
 
     private var doorStatusListener: ListenerRegistration? = null
@@ -352,13 +354,23 @@ class BoxDetailActivity : AppCompatActivity() {
 
     private fun setupRecyclerViews() {
         // 택배 리스트
-        packageAdapter = PackageAdapter(packagesList) { packageItem ->
-            val intent = Intent(this, PackageEditActivity::class.java).apply {
-                putExtra("boxId", boxId)
-                putExtra("packageId", packageItem.id)
+        packageAdapter = PackageAdapter(
+            onItemClick = { packageItem ->
+                val intent = Intent(this, PackageEditActivity::class.java).apply {
+                    putExtra("boxId", boxId)
+                    putExtra("packageId", packageItem.id)
+                }
+                startActivity(intent)
+            },
+            onStatusChange = { packageItem, newStatus ->
+                // 상태 변경 로직 구현
+                updatePackageStatus(packageItem, newStatus)
+            },
+            onDeleteClick = { packageItem ->
+                // 삭제 로직 구현
+                deletePackage(packageItem)
             }
-            startActivity(intent)
-        }
+        )
 
         binding.rvRecentPackages.apply {
             layoutManager = LinearLayoutManager(this@BoxDetailActivity)
@@ -409,20 +421,20 @@ class BoxDetailActivity : AppCompatActivity() {
                     return@addSnapshotListener
                 }
 
-                packagesList.clear()
+                val newPackagesList = mutableListOf<PackageItem>()
 
                 if (snapshots != null && !snapshots.isEmpty) {
                     for (doc in snapshots) {
-                        val pkg = doc.toObject(Package::class.java)
-                        packagesList.add(PackageItem(doc.id, pkg))
+                        val pkg = doc.toObject(PackageInfo::class.java)
+                        newPackagesList.add(PackageItem(doc.id, pkg))
 
                     }
                 }
 
-                packageAdapter.notifyDataSetChanged()
+                packageAdapter.submitList(newPackagesList)
 
                 // 빈 상태 표시
-                updateEmptyPackageState()
+                updateEmptyPackageState(newPackagesList)
             }
 
         // 활동 로그 리스너 (최근 5개)
@@ -577,8 +589,8 @@ class BoxDetailActivity : AppCompatActivity() {
     }
 
     // 빈 택배 상태 업데이트
-    private fun updateEmptyPackageState() {
-        if (packagesList.isEmpty()) {
+    private fun updateEmptyPackageState(packages: List<PackageItem>) {
+        if (packages.isEmpty()) {
             binding.tvEmptyPackages.visibility = android.view.View.VISIBLE
             binding.rvRecentPackages.visibility = android.view.View.GONE
         } else {
@@ -649,6 +661,70 @@ class BoxDetailActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 Log.e("BoxDetailActivity", "로그 기록 실패", e)
             }
+    }
+
+    // 택배 상태 변경
+    private fun updatePackageStatus(packageItem: PackageItem, newStatus: DeliveryStatus) {
+        val packageRef = db.collection("boxes").document(boxId)
+            .collection("packages").document(packageItem.id)
+
+        val updateData = mutableMapOf<String, Any>()
+
+        when (newStatus) {
+            DeliveryStatus.DELIVERED -> {
+                updateData["isDelivered"] = true
+                updateData["deliveredAt"] = com.google.firebase.Timestamp.now()
+                updateData["status"] = newStatus.name
+            }
+            DeliveryStatus.IN_BOX -> {
+                updateData["isInBox"] = true
+                updateData["inBoxAt"] = com.google.firebase.Timestamp.now()
+                updateData["status"] = newStatus.name
+            }
+            else -> {
+                updateData["status"] = newStatus.name
+            }
+        }
+
+        packageRef.update(updateData)
+            .addOnSuccessListener {
+                Toast.makeText(this, "상태가 변경되었습니다", Toast.LENGTH_SHORT).show()
+
+                // 상태 변경 로그 기록
+                val uid = auth.currentUser?.uid ?: ""
+                addActivityLog("상태 변경: ${newStatus.name}", uid)
+            }
+            .addOnFailureListener { e ->
+                Log.e("BoxDetailActivity", "상태 변경 실패", e)
+                Toast.makeText(this, "상태 변경 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    // 택배 삭제
+    private fun deletePackage(packageItem: PackageItem) {
+        AlertDialog.Builder(this)
+            .setTitle("택배 삭제")
+            .setMessage("정말로 이 택배를 삭제하시겠습니까?\n\n삭제된 택배는 복구할 수 없습니다.")
+            .setPositiveButton("삭제") { _, _ ->
+                // 삭제 로직
+                val packageRef = db.collection("boxes").document(boxId)
+                    .collection("packages").document(packageItem.id)
+
+                packageRef.delete()
+                    .addOnSuccessListener {
+                        Toast.makeText(this, "택배가 삭제되었습니다", Toast.LENGTH_SHORT).show()
+
+                        // 삭제 로그 기록
+                        val uid = auth.currentUser?.uid ?: ""
+                        addActivityLog("택배 삭제: ${packageItem.data.itemName ?: "상품명 없음"}", uid)
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("BoxDetailActivity", "택배 삭제 실패", e)
+                        Toast.makeText(this, "삭제 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .setNegativeButton("취소", null)
+            .show()
     }
 
     override fun onDestroy() {
