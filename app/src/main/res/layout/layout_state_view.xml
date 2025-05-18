@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- 로딩 -->
+    <ProgressBar
+        android:id="@+id/state_loading"
+        android:layout_gravity="center"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <!-- 빈 화면 -->
+    <LinearLayout
+        android:id="@+id/state_empty"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <ImageView
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:src="@drawable/ic_package_empty"
+            android:tint="@color/gray_300" />
+        <TextView
+            android:id="@+id/state_empty_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="등록된 항목이 없습니다"
+            android:textSize="16sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginTop="12dp" />
+    </LinearLayout>
+
+    <!-- 오류 화면 -->
+    <LinearLayout
+        android:id="@+id/state_error"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <ImageView
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:src="@drawable/ic_error"
+            android:tint="@color/warning" />
+        <TextView
+            android:id="@+id/state_error_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="오류가 발생했습니다"
+            android:textSize="16sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginTop="12dp" />
+        <Button
+            android:id="@+id/state_error_retry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="다시 시도"
+            android:layout_marginTop="8dp" />
+    </LinearLayout>
+</FrameLayout>

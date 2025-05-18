@@ -4,7 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.deliverybox.core.MainActivity
+import com.example.deliverybox.app.MainActivity
 import com.example.deliverybox.databinding.ActivityRegisterBoxBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue

@@ -1,4 +1,4 @@
-package com.example.deliverybox.delivery
+package com.example.deliverybox.delivery.adapter
 
 import android.content.res.ColorStateList
 import android.view.LayoutInflater
@@ -11,8 +11,8 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.deliverybox.R
 import com.example.deliverybox.databinding.ItemPackageCardBinding
-import com.example.deliverybox.model.DeliveryStatus
-import com.example.deliverybox.model.PackageItem
+import com.example.deliverybox.delivery.DeliveryStatus
+import com.example.deliverybox.delivery.PackageInfo
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -22,16 +22,16 @@ class PackageAdapter(
     private val onDeleteClick: (PackageItem) -> Unit  // 삭제 콜백 추가
 ) : ListAdapter<PackageItem, PackageAdapter.PackageViewHolder>(PackageDiffCallback()) {
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PackageViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PackageAdapter.PackageViewHolder {
         val binding = ItemPackageCardBinding.inflate(
             LayoutInflater.from(parent.context),
             parent,
             false
         )
-        return PackageViewHolder(binding, onItemClick, onStatusChange)
+        return PackageAdapter.PackageViewHolder(binding, onItemClick, onStatusChange)
     }
 
-    override fun onBindViewHolder(holder: PackageViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: PackageAdapter.PackageViewHolder, position: Int) {
         holder.bind(getItem(position))
     }
 
@@ -55,6 +55,12 @@ class PackageAdapter(
         fun bind(item: PackageItem) {
             val packageInfo = item.data
 
+            // 카드 테두리 설정 (stroke)
+            (binding.root as MaterialCardView).apply {
+                strokeWidth = 1
+                strokeColor = ContextCompat.getColor(context, R.color.badge_stroke)
+            }
+
             // 기본 정보 설정
             binding.tvTrackingNumber.text = formatTrackingNumber(packageInfo.trackingNumber)
             binding.tvCourierCompany.text = packageInfo.courierCompany
@@ -72,7 +78,8 @@ class PackageAdapter(
 
             // 퀵 액션 버튼 (상태 변경 가능한 경우만)
             if (packageInfo.status == DeliveryStatus.DELIVERED ||
-                packageInfo.status == DeliveryStatus.IN_BOX) {
+                packageInfo.status == DeliveryStatus.IN_BOX
+            ) {
                 binding.btnQuickAction.visibility = View.VISIBLE
                 binding.btnQuickAction.setOnClickListener { showQuickActionMenu(item) }
             } else {
@@ -90,14 +97,19 @@ class PackageAdapter(
                 DeliveryStatus.DELIVERED -> Triple("수령완료", R.color.success, R.drawable.ic_check_circle)
             }
 
-            binding.statusBadge.text = text
-            binding.statusBadge.setBackgroundColor(
+            binding.tvStatusBadge.text = text
+            binding.tvStatusBadge.backgroundTintList = ColorStateList.valueOf(
                 ContextCompat.getColor(itemView.context, colorRes)
             )
-            binding.statusIcon.setImageResource(iconRes)
-            binding.statusIcon.setColorFilter(
+
+            binding.ivStatusIcon.setImageResource(iconRes)
+            binding.ivStatusIcon.setColorFilter(
                 ContextCompat.getColor(itemView.context, colorRes)
             )
+
+            // 접근성 설명
+            binding.ivStatusIcon.contentDescription = "상태 아이콘: $text"
+
         }
 
         private fun updateProgressIndicator(status: DeliveryStatus) {

@@ -5,6 +5,8 @@ plugins {
     id("com.google.gms.google-services")
 
     id("kotlin-parcelize")
+
+    id("kotlin-kapt")
 }
 
 android {
@@ -58,10 +60,16 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-process:2.6.2")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // 배송 조회 API
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // Room DB 라이브러리
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
 
 
     // 보안 관련 라이브러리

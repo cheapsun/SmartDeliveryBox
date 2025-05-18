@@ -5,6 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- AppBar -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -41,14 +42,20 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
+    <!-- 상태 뷰 include -->
+    <include
+        layout="@layout/layout_state_view"
+        android:id="@+id/include_state_view" />
+
+    <!-- 본문 영역 -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipe_refresh"
+        android:id="@+id/swipe_refresh_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_view"
+            android:id="@+id/recycler_view_packages"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
@@ -65,8 +72,7 @@
         android:orientation="vertical"
         android:gravity="center"
         android:padding="32dp"
-        android:visibility="gone"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:visibility="gone">
 
         <ImageView
             android:layout_width="120dp"
@@ -75,6 +81,7 @@
             android:tint="@color/gray_300" />
 
         <TextView
+            android:id="@+id/tv_empty_message"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="등록된 택배가 없습니다"
@@ -91,7 +98,6 @@
             android:textColor="@color/text_secondary"
             android:gravity="center"
             android:layout_marginTop="8dp" />
-
     </LinearLayout>
 
     <!-- 검색 결과 없음 뷰 -->
@@ -102,8 +108,7 @@
         android:orientation="vertical"
         android:gravity="center"
         android:padding="32dp"
-        android:visibility="gone"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:visibility="gone">
 
         <ImageView
             android:layout_width="96dp"
@@ -112,6 +117,7 @@
             android:tint="@color/gray_300" />
 
         <TextView
+            android:id="@+id/tv_search_empty_message"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="검색 결과가 없습니다"
@@ -119,9 +125,9 @@
             android:textStyle="bold"
             android:textColor="@color/text_secondary"
             android:layout_marginTop="16dp" />
-
     </LinearLayout>
 
+    <!-- 플로팅 버튼 -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_add_package"
         android:layout_width="wrap_content"

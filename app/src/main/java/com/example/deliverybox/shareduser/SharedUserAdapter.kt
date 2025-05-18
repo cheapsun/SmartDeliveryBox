@@ -1,4 +1,4 @@
-package adapter
+package com.example.deliverybox.shareduser
 
 import android.graphics.Typeface
 import android.view.LayoutInflater

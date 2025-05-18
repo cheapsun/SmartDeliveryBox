@@ -1,4 +1,4 @@
-package com.example.deliverybox.delivery
+package com.example.deliverybox.delivery.permission
 
 import android.app.Activity
 import android.content.Context

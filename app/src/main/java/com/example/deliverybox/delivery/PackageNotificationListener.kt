@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Parcelable
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import kotlinx.parcelize.Parcelize
 
 class PackageNotificationListener : NotificationListenerService() {
 

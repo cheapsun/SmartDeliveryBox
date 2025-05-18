@@ -1,4 +1,4 @@
-package com.example.deliverybox.delivery
+package com.example.deliverybox.delivery.dialog
 
 import android.app.Dialog
 import android.os.Bundle
@@ -6,9 +6,9 @@ import android.view.View
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import com.example.deliverybox.databinding.DialogAutoRegisterBinding
-import com.example.deliverybox.model.ExtractedPackageInfo
-import com.example.deliverybox.model.PackageInfo
-import com.example.deliverybox.ui.PackageFragment
+import com.example.deliverybox.delivery.ExtractedPackageInfo
+import com.example.deliverybox.delivery.PackageFragment
+import com.example.deliverybox.delivery.PackageInfo
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class AutoRegisterDialogFragment : DialogFragment() {

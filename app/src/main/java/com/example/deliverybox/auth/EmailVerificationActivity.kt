@@ -12,8 +12,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.deliverybox.databinding.ActivityEmailVerificationBinding
-import com.example.deliverybox.repository.FirebaseAuthRepository
-import com.example.deliverybox.utils.AccountUtils
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 

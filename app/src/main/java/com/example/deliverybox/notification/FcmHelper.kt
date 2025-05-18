@@ -1,4 +1,4 @@
-package com.example.deliverybox.utils
+package com.example.deliverybox.notification
 
 import android.util.Log
 import com.google.firebase.messaging.FirebaseMessaging

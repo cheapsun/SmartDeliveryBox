@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_mark_received"
+        android:title="수령 완료로 변경"
+        android:icon="@drawable/ic_check_circle"
+        android:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_mark_in_box"
+        android:title="보관 중으로 변경"
+        android:icon="@drawable/ic_box"
+        android:showAsAction="ifRoom" />
+</menu>

@@ -15,12 +15,11 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.deliverybox.databinding.ActivitySignupPasswordBinding
-import com.example.deliverybox.repository.FirebaseAuthRepository
 import com.example.deliverybox.utils.AccountUtils
 import com.example.deliverybox.utils.PasswordStrengthEvaluator
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.launch
-import com.example.deliverybox.core.MainActivity
+import com.example.deliverybox.app.MainActivity
 
 class SignupPasswordActivity : AppCompatActivity() {
 

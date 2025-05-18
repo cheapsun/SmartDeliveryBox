@@ -1,4 +1,4 @@
-package com.example.deliverybox.repository
+package com.example.deliverybox.data.repositories
 
 import com.example.deliverybox.core.UserData
 import kotlinx.coroutines.flow.Flow

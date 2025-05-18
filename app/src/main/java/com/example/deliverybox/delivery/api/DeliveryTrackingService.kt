@@ -1,10 +1,7 @@
-package com.example.deliverybox.delivery
+package com.example.deliverybox.delivery.api
 
-import com.example.deliverybox.delivery.TrackingInfo
-import com.example.deliverybox.delivery.DeliveryApiResponse
 import com.example.deliverybox.delivery.DeliveryStatus
 import com.example.deliverybox.delivery.DeliveryStep
-import com.example.deliverybox.delivery.LocationInfo
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET

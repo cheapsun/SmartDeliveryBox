@@ -1,4 +1,4 @@
-package com.example.deliverybox.delivery
+package com.example.deliverybox.delivery.swipe
 
 import android.graphics.Canvas
 import android.graphics.Color
@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.example.deliverybox.R
+import com.example.deliverybox.delivery.adapter.PackageAdapter
 
 class PackageSwipeCallback(
     private val adapter: PackageAdapter

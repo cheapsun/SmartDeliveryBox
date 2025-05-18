@@ -15,11 +15,10 @@ import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.deliverybox.databinding.ActivityLoginBinding
-import com.example.deliverybox.repository.FirebaseAuthRepository
 import com.example.deliverybox.utils.SharedPrefsHelper
 import kotlinx.coroutines.launch
 import com.example.deliverybox.R
-import com.example.deliverybox.core.MainActivity
+import com.example.deliverybox.app.MainActivity
 
 class LoginActivity : AppCompatActivity() {
 

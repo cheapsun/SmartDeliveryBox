@@ -1,125 +1,85 @@
 package com.example.deliverybox.delivery
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.*
+import com.example.deliverybox.domain.usecases.GetPackagesUseCase
+import com.example.deliverybox.domain.repositories.PackageRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class PackageViewModel(
-    private val packageRepository: PackageRepository,
-    private val trackingService: DeliveryTrackingService
+@HiltViewModel
+class PackageViewModel @Inject constructor(
+    private val getPackagesUseCase: GetPackagesUseCase,
+    private val repository: PackageRepository
 ) : ViewModel() {
 
-    private val _packageInfo = MutableLiveData<PackageInfo>()
-    val packageInfo: LiveData<PackageInfo> = _packageInfo
+    // UI 상태 정의 (내부 sealed class)
+    sealed class UiState {
+        object Loading : UiState()
+        object Empty : UiState()
+        data class Success(val packages: List<PackageInfo>) : UiState()
+        data class Error(val message: String) : UiState()
+    }
 
-    private val _trackingInfo = MutableLiveData<TrackingInfo?>()
-    val trackingInfo: LiveData<TrackingInfo?> = _trackingInfo
+    private val _uiState = MutableLiveData<UiState>()
+    val uiState: LiveData<UiState> = _uiState
 
-    private val _uiState = MutableLiveData<PackageDetailUiState>()
-    val uiState: LiveData<PackageDetailUiState> = _uiState
+    // 검색어와 필터 상태 보관
+    private var currentQuery: String = ""
+    private var currentFilter: DeliveryStatus? = null
 
-    fun loadPackageDetail(boxId: String, packageId: String) {
+    // 전체 로드 함수
+    fun loadPackages(boxId: String) {
+        _uiState.value = UiState.Loading
         viewModelScope.launch {
-            _uiState.value = PackageDetailUiState.Loading
-
-            try {
-                val packageInfo = packageRepository.getPackageById(boxId, packageId)
-
-                if (packageInfo != null) {
-                    _packageInfo.value = packageInfo
-
-                    // 배송 추적 정보 로드
-                    loadTrackingInfo(packageInfo)
-
-                    _uiState.value = PackageDetailUiState.Success
-                } else {
-                    _uiState.value = PackageDetailUiState.Error("패키지를 찾을 수 없습니다")
-                }
-            } catch (e: Exception) {
-                _uiState.value = PackageDetailUiState.Error(e.message ?: "알 수 없는 오류")
-            }
-        }
-    }
-
-    private suspend fun loadTrackingInfo(packageInfo: PackageInfo) {
-        trackingService.trackPackage(
-            packageInfo.courierCompany,
-            packageInfo.trackingNumber
-        ).fold(
-            onSuccess = { trackingInfo ->
-                _trackingInfo.value = trackingInfo
-
-                // 상태가 변경된 경우 업데이트
-                if (trackingInfo.currentStatus != packageInfo.status) {
-                    updatePackageStatus(packageInfo, trackingInfo)
-                }
-            },
-            onFailure = { error ->
-                Log.w("PackageDetailViewModel", "추적 정보 로드 실패: ${error.message}")
-                _trackingInfo.value = null
-            }
-        )
-    }
-
-    private suspend fun updatePackageStatus(packageInfo: PackageInfo, trackingInfo: TrackingInfo) {
-        val updatedPackage = packageInfo.copy(
-            status = trackingInfo.currentStatus,
-            deliverySteps = trackingInfo.deliverySteps,
-            lastUpdated = System.currentTimeMillis()
-        )
-
-        packageRepository.updatePackage(packageInfo.boxId, updatedPackage)
-            .onSuccess {
-                _packageInfo.value = updatedPackage
-            }
-    }
-
-    fun refreshTrackingInfo() {
-        val packageInfo = _packageInfo.value ?: return
-
-        viewModelScope.launch {
-            _uiState.value = PackageDetailUiState.Loading
-
-            try {
-                loadTrackingInfo(packageInfo)
-                _uiState.value = PackageDetailUiState.Success
-            } catch (e: Exception) {
-                _uiState.value = PackageDetailUiState.Error("새로고침 실패: ${e.message}")
-            }
-        }
-    }
-
-    fun markAsReceived() {
-        val packageInfo = _packageInfo.value ?: return
-
-        viewModelScope.launch {
-            try {
-                val updatedPackage = packageInfo.copy(
-                    status = DeliveryStatus.DELIVERED,
-                    deliveredAt = System.currentTimeMillis(),
-                    lastUpdated = System.currentTimeMillis()
-                )
-
-                packageRepository.updatePackage(packageInfo.boxId, updatedPackage)
-                    .onSuccess {
-                        _packageInfo.value = updatedPackage
+            getPackagesUseCase(boxId)
+                .catch { e -> _uiState.value = UiState.Error(e.message ?: "알 수 없는 오류") }
+                .collect { list ->
+                    if (list.isEmpty()) {
+                        _uiState.value = UiState.Empty
+                    } else {
+                        _uiState.value = UiState.Success(list)
                     }
-                    .onFailure {
-                        _uiState.value = PackageDetailUiState.Error("수령 확인 실패")
-                    }
-            } catch (e: Exception) {
-                _uiState.value = PackageDetailUiState.Error(e.message ?: "수령 확인 실패")
-            }
+                }
         }
     }
+
+    // 상태 변경
+    fun updateStatus(boxId: String, packageId: String, status: DeliveryStatus) {
+        viewModelScope.launch {
+            repository.updatePackageStatus(boxId, packageId, status.name)
+            loadPackages(boxId)
+        }
+    }
+
+    // 삭제
+    fun deletePackage(boxId: String, packageId: String) {
+        viewModelScope.launch {
+            repository.deletePackage(boxId, packageId)
+            loadPackages(boxId)
+        }
+    }
+
+    // 검색어 설정
+    fun search(query: String, boxId: String) {
+        currentQuery = query
+        loadPackages(boxId)
+    }
+
+    // 필터 설정
+    fun filter(status: DeliveryStatus?, boxId: String) {
+        currentFilter = status
+        loadPackages(boxId)
+    }
+
+    // 리스트 필터링 (내부 혹은 Fragment에서 처리 가능)
+    fun applyFilters(list: List<PackageInfo>): List<PackageInfo> = list
+        .filter { item ->
+            (currentFilter == null || item.status == currentFilter) &&
+                    (currentQuery.isBlank() ||
+                            item.trackingNumber.contains(currentQuery, ignoreCase = true) ||
+                            (item.itemName?.contains(currentQuery, ignoreCase = true) == true))
+        }
 }
 
-sealed class PackageDetailUiState {
-    object Loading : PackageDetailUiState()
-    object Success : PackageDetailUiState()
-    data class Error(val message: String) : PackageDetailUiState()
-}

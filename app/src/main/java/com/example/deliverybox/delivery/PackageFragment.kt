@@ -2,20 +2,20 @@ package com.example.deliverybox.delivery
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
+import android.view.*
+import android.widget.SearchView
+import android.widget.Button
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.deliverybox.R
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
+import com.example.deliverybox.databinding.FragmentPackageBinding
+import com.example.deliverybox.delivery.adapter.PackageAdapter
+import com.example.deliverybox.delivery.adapter.PackageItem
+import com.example.deliverybox.delivery.dialog.FilterDialogFragment
+import com.example.deliverybox.delivery.swipe.PackageSwipeCallback
+import com.example.deliverybox.ui.StateViewHelper
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class PackageFragment : Fragment() {
 
@@ -25,24 +25,28 @@ class PackageFragment : Fragment() {
     private lateinit var viewModel: PackageViewModel
     private lateinit var adapter: PackageAdapter
 
+    private var allItems: List<PackageItem> = emptyList()
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentPackageBinding.inflate(inflater, container, false)
+        setHasOptionsMenu(true)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        viewModel = ViewModelProvider(this)[PackageViewModel::class.java]
+
         setupRecyclerView()
-        setupViewModel()
         observeViewModel()
+        setupSearchView()
+        viewModel.load(getCurrentBoxId()) // ✅ boxId 로드
     }
 
     private fun setupRecyclerView() {
-        // 어댑터 초기화
         adapter = PackageAdapter(
             onItemClick = { packageItem ->
-                // PackageDetailActivity로 이동
                 val intent = Intent(requireContext(), PackageDetailActivity::class.java).apply {
                     putExtra("packageId", packageItem.id)
                     putExtra("boxId", getCurrentBoxId())
@@ -50,63 +54,84 @@ class PackageFragment : Fragment() {
                 startActivity(intent)
             },
             onStatusChange = { packageItem, newStatus ->
-                // 상태 변경
                 viewModel.updatePackageStatus(packageItem.id, newStatus)
             },
             onDeleteClick = { packageItem ->
-                // 삭제 확인 다이얼로그
                 showDeleteConfirmDialog(packageItem)
             }
         )
 
-        // RecyclerView 설정
         binding.recyclerViewPackages.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = this@PackageFragment.adapter
-
-            // 🔥 스와이프 제스처 연결
-            val swipeCallback = PackageSwipeCallback(this@PackageFragment.adapter)
-            val itemTouchHelper = ItemTouchHelper(swipeCallback)
-            itemTouchHelper.attachToRecyclerView(this)
+            ItemTouchHelper(PackageSwipeCallback(adapter)).attachToRecyclerView(this)
         }
 
-        // 풀투리프레시 설정 (선택사항)
-        binding.swipeRefreshLayout?.setOnRefreshListener {
+        binding.swipeRefreshLayout.setOnRefreshListener {
             viewModel.refreshPackages()
         }
     }
 
-    private fun setupViewModel() {
-        // ViewModel 초기화
-        viewModel = ViewModelProvider(this)[PackageViewModel::class.java]
-    }
-
     private fun observeViewModel() {
-        viewModel.filteredPackages.observe(viewLifecycleOwner) { packages ->
-            val packageItems = packages.map { PackageItem(it.id, it) }
-            adapter.submitList(packageItems)
-
-            // 빈 상태 처리
-            binding.tvEmptyMessage.visibility = if (packages.isEmpty()) View.VISIBLE else View.GONE
-        }
-
         viewModel.uiState.observe(viewLifecycleOwner) { state ->
             when (state) {
-                is PackageUiState.Loading -> {
-                    // 로딩 표시
-                }
-                is PackageUiState.Success -> {
-                    binding.swipeRefreshLayout?.isRefreshing = false
-                }
-                is PackageUiState.Error -> {
-                    binding.swipeRefreshLayout?.isRefreshing = false
-                    Toast.makeText(requireContext(), state.message, Toast.LENGTH_SHORT).show()
-                }
-                is PackageUiState.Empty -> {
-                    binding.swipeRefreshLayout?.isRefreshing = false
+                is PackageViewModel.PackageUiState.Loading -> StateViewHelper.showLoading(binding.includeStateView)
+                is PackageViewModel.PackageUiState.Empty -> StateViewHelper.showEmpty(binding.includeStateView)
+                is PackageViewModel.PackageUiState.Error -> StateViewHelper.showError(binding.includeStateView, state.message)
+                is PackageViewModel.PackageUiState.Success -> {
+                    allItems = state.list
+                    adapter.submitList(state.list)
+                    StateViewHelper.hideAll(binding.includeStateView)
                 }
             }
+
+            binding.swipeRefreshLayout.isRefreshing = false
+
+            binding.includeStateView.findViewById<Button>(com.example.deliverybox.R.id.state_error_retry)?.setOnClickListener {
+                viewModel.refreshPackages()
+            }
         }
+    }
+
+    private fun setupSearchView() {
+        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean = true
+            override fun onQueryTextChange(newText: String?): Boolean {
+                val keyword = newText.orEmpty()
+                val filtered = allItems.filter {
+                    it.data.trackingNumber.contains(keyword, ignoreCase = true) ||
+                            it.data.itemName?.contains(keyword, ignoreCase = true) == true
+                }
+                adapter.submitList(filtered)
+                return true
+            }
+        })
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            com.example.deliverybox.R.id.action_filter -> {
+                FilterDialogFragment { selectedStatus ->
+                    applyStatusFilter(selectedStatus)
+                }.show(childFragmentManager, "FilterDialog")
+                true
+            }
+            com.example.deliverybox.R.id.action_search -> {
+                binding.searchView.visibility = View.VISIBLE
+                binding.searchView.requestFocus()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun applyStatusFilter(status: DeliveryStatus?) {
+        val filtered = if (status == null) {
+            allItems
+        } else {
+            allItems.filter { it.data.status == status }
+        }
+        adapter.submitList(filtered)
     }
 
     private fun showDeleteConfirmDialog(packageItem: PackageItem) {
@@ -117,18 +142,15 @@ class PackageFragment : Fragment() {
                 viewModel.deletePackage(packageItem.id)
             }
             .setNegativeButton("취소") { _, _ ->
-                // 스와이프 되돌리기
                 adapter.notifyItemChanged(adapter.currentList.indexOf(packageItem))
             }
             .setOnCancelListener {
-                // 다이얼로그 취소시 스와이프 되돌리기
                 adapter.notifyItemChanged(adapter.currentList.indexOf(packageItem))
             }
             .show()
     }
 
     private fun getCurrentBoxId(): String {
-        // 현재 선택된 박스 ID 가져오기 로직
         return "current_box_id"
     }
 

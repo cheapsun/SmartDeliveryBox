@@ -3,9 +3,7 @@ package com.example.deliverybox.delivery
 import android.content.Context
 import android.util.Log
 import androidx.work.*
-import com.example.deliverybox.model.DeliveryStatus
-import com.example.deliverybox.model.PackageInfo
-import kotlinx.coroutines.coroutineScope
+import com.example.deliverybox.delivery.api.DeliveryTrackerService
 import java.util.concurrent.TimeUnit
 
 

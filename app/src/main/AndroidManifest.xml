@@ -69,10 +69,10 @@
             android:name=".auth.SignupEmailActivity"
             android:exported="false" />
         <activity
-            android:name=".core.MainActivity"
+            android:name=".app.MainActivity"
             android:exported="false" />
         <activity
-            android:name=".core.SplashActivity"
+            android:name=".app.SplashActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

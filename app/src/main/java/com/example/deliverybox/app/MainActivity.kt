@@ -1,4 +1,4 @@
-package com.example.deliverybox.core
+package com.example.deliverybox.app
 
 import android.content.Intent
 import android.os.Bundle

@@ -8,9 +8,7 @@ import com.example.deliverybox.R
 import com.example.deliverybox.databinding.ActivityPackageDetailBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.lifecycle.observe
-import com.example.deliverybox.delivery.PackageInfo
-import com.example.deliverybox.delivery.TrackingInfo
-import com.example.deliverybox.delivery.DeliveryStatus
+import com.example.deliverybox.delivery.api.TrackingInfo
 
 class PackageDetailActivity : AppCompatActivity() {
 

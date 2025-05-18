@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
-import adapter.SharedUserAdapter
 import com.example.deliverybox.databinding.ActivitySharedUserManageBinding
 
 class SharedUserManageActivity : AppCompatActivity() {

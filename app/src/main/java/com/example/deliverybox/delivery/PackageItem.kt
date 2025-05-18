@@ -10,6 +10,16 @@ enum class DeliveryStatus {
     DELIVERED        // 수령완료
 }
 
+// 상태값을 한글로 표시하는 확장 함수
+fun DeliveryStatus.toKorean(): String = when (this) {
+    DeliveryStatus.REGISTERED -> "등록"
+    DeliveryStatus.PICKED_UP -> "접수"
+    DeliveryStatus.IN_TRANSIT -> "배송중"
+    DeliveryStatus.OUT_FOR_DELIVERY -> "배송출발"
+    DeliveryStatus.IN_BOX -> "보관중"
+    DeliveryStatus.DELIVERED -> "수령완료"
+}
+
 // 배송 단계 정보
 data class DeliveryStep(
     val stepType: String,
@@ -49,3 +59,4 @@ data class PackageInfo(
     val estimatedDelivery: Long? = null,
     val memo: String? = null
 )
+

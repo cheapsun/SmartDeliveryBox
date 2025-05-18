@@ -1,4 +1,4 @@
-package com.example.deliverybox.core
+package com.example.deliverybox.app
 
 import android.content.Intent
 import android.os.Bundle
@@ -15,7 +15,7 @@ import com.example.deliverybox.box.BoxDetailActivity
 import com.example.deliverybox.databinding.FragmentHomeBinding
 import com.example.deliverybox.box.DeliveryBox
 import com.example.deliverybox.box.RegisterBoxActivity
-import com.example.deliverybox.dialog.RegisterBoxMethodDialogFragment
+import com.example.deliverybox.box.dialog.RegisterBoxMethodDialogFragment
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration

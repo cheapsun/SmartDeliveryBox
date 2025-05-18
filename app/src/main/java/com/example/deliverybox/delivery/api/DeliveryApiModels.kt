@@ -1,4 +1,7 @@
-package com.example.deliverybox.delivery
+package com.example.deliverybox.delivery.api
+
+import com.example.deliverybox.delivery.DeliveryStatus
+import com.example.deliverybox.delivery.DeliveryStep
 
 data class DeliveryApiResponse(
     val trackingNumber: String?,

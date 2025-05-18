@@ -1,4 +1,4 @@
-package com.example.deliverybox.dialog
+package com.example.deliverybox.box.dialog
 
 import android.content.Intent
 import android.os.Bundle

@@ -1,6 +1,8 @@
-package com.example.deliverybox.repository
+package com.example.deliverybox.auth
 
 import com.example.deliverybox.core.UserData
+import com.example.deliverybox.data.repositories.AuthRepository
+import com.example.deliverybox.data.repositories.AuthState
 import com.example.deliverybox.utils.FirebaseAuthExceptionMapper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
