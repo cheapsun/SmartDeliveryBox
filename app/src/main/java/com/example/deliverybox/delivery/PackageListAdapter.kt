@@ -34,7 +34,7 @@ class PackageAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PackageViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_package_info, parent, false)
+            .inflate(R.layout.item_package_card, parent, false)
         return PackageViewHolder(view)
     }
 

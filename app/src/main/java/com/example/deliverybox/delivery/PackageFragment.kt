@@ -19,115 +19,121 @@ import com.google.firebase.firestore.Query
 
 class PackageFragment : Fragment() {
 
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var emptyMessage: TextView
+    private var _binding: FragmentPackageBinding? = null
+    private val binding get() = _binding!!
+
+    private lateinit var viewModel: PackageViewModel
     private lateinit var adapter: PackageAdapter
-    private lateinit var fabAddPackage: FloatingActionButton
 
-    private val packageList = mutableListOf<PackageItem>()
-
-    private val db = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
-    private var boxId: String = ""
-
-    private val editLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            Log.d("PackageFragment", "📦 수정/삭제 결과 수신 → 새로고침")
-            loadPackages()
-        }
-    }
-
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(R.layout.fragment_package, container, false)
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        _binding = FragmentPackageBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        recyclerView = view.findViewById(R.id.recycler_view_packages)
-        emptyMessage = view.findViewById(R.id.tv_empty_message)
-        fabAddPackage = view.findViewById(R.id.fab_add_package)
-
-        recyclerView.layoutManager = LinearLayoutManager(requireContext())
-
-        setupFabClickListener()
-
-        // 사용자 및 박스 ID 가져오기
-        val uid = auth.currentUser?.uid
-        if (uid != null) {
-            db.collection("users").document(uid).get()
-                .addOnSuccessListener { userDoc ->
-                    boxId = userDoc.getString("mainBoxId") ?: return@addOnSuccessListener
-                    loadPackages()
-                }
-        } else {
-            emptyMessage.text = "로그인이 필요합니다."
-            emptyMessage.visibility = View.VISIBLE
-            recyclerView.visibility = View.GONE
-        }
+        setupRecyclerView()
+        setupViewModel()
+        observeViewModel()
     }
 
-    private fun setupFabClickListener() {
-        fabAddPackage.setOnClickListener {
-            if (boxId.isNotEmpty()) {
-                val intent = Intent(requireContext(), RegisterPackageActivity::class.java).apply {
-                    putExtra("boxId", boxId)
+    private fun setupRecyclerView() {
+        // 어댑터 초기화
+        adapter = PackageAdapter(
+            onItemClick = { packageItem ->
+                // PackageDetailActivity로 이동
+                val intent = Intent(requireContext(), PackageDetailActivity::class.java).apply {
+                    putExtra("packageId", packageItem.id)
+                    putExtra("boxId", getCurrentBoxId())
                 }
                 startActivity(intent)
+            },
+            onStatusChange = { packageItem, newStatus ->
+                // 상태 변경
+                viewModel.updatePackageStatus(packageItem.id, newStatus)
+            },
+            onDeleteClick = { packageItem ->
+                // 삭제 확인 다이얼로그
+                showDeleteConfirmDialog(packageItem)
+            }
+        )
+
+        // RecyclerView 설정
+        binding.recyclerViewPackages.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = this@PackageFragment.adapter
+
+            // 🔥 스와이프 제스처 연결
+            val swipeCallback = PackageSwipeCallback(this@PackageFragment.adapter)
+            val itemTouchHelper = ItemTouchHelper(swipeCallback)
+            itemTouchHelper.attachToRecyclerView(this)
+        }
+
+        // 풀투리프레시 설정 (선택사항)
+        binding.swipeRefreshLayout?.setOnRefreshListener {
+            viewModel.refreshPackages()
+        }
+    }
+
+    private fun setupViewModel() {
+        // ViewModel 초기화
+        viewModel = ViewModelProvider(this)[PackageViewModel::class.java]
+    }
+
+    private fun observeViewModel() {
+        viewModel.filteredPackages.observe(viewLifecycleOwner) { packages ->
+            val packageItems = packages.map { PackageItem(it.id, it) }
+            adapter.submitList(packageItems)
+
+            // 빈 상태 처리
+            binding.tvEmptyMessage.visibility = if (packages.isEmpty()) View.VISIBLE else View.GONE
+        }
+
+        viewModel.uiState.observe(viewLifecycleOwner) { state ->
+            when (state) {
+                is PackageUiState.Loading -> {
+                    // 로딩 표시
+                }
+                is PackageUiState.Success -> {
+                    binding.swipeRefreshLayout?.isRefreshing = false
+                }
+                is PackageUiState.Error -> {
+                    binding.swipeRefreshLayout?.isRefreshing = false
+                    Toast.makeText(requireContext(), state.message, Toast.LENGTH_SHORT).show()
+                }
+                is PackageUiState.Empty -> {
+                    binding.swipeRefreshLayout?.isRefreshing = false
+                }
             }
         }
     }
 
-    private fun loadPackages() {
-        db.collection("boxes").document(boxId)
-            .collection("packages")
-            .whereEqualTo("valid", true)
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener { result ->
-                packageList.clear()
-                for (document in result) {
-                    val pkg = document.toObject(Package::class.java)
-                    val id = document.id
-                    packageList.add(PackageItem(id, pkg))
-                }
-
-                if (packageList.isEmpty()) {
-                    emptyMessage.visibility = View.VISIBLE
-                    recyclerView.visibility = View.GONE
-                } else {
-                    emptyMessage.visibility = View.GONE
-                    recyclerView.visibility = View.VISIBLE
-
-                    adapter = PackageAdapter(packageList.toList()) { selectedItem ->
-                        val intent = Intent(requireContext(), PackageEditActivity::class.java).apply {
-                            putExtra("boxId", boxId)
-                            putExtra("packageId", selectedItem.id)
-                        }
-                        editLauncher.launch(intent)
-                    }
-
-                    recyclerView.adapter = adapter
-                }
+    private fun showDeleteConfirmDialog(packageItem: PackageItem) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("택배 삭제")
+            .setMessage("'${packageItem.data.trackingNumber}' 택배를 삭제하시겠습니까?")
+            .setPositiveButton("삭제") { _, _ ->
+                viewModel.deletePackage(packageItem.id)
             }
-            .addOnFailureListener { e ->
-                Log.e("PackageFragment", "🔥 패키지 불러오기 실패: ${e.message}")
-                emptyMessage.text = "데이터를 불러올 수 없습니다."
-                emptyMessage.visibility = View.VISIBLE
-                recyclerView.visibility = View.GONE
+            .setNegativeButton("취소") { _, _ ->
+                // 스와이프 되돌리기
+                adapter.notifyItemChanged(adapter.currentList.indexOf(packageItem))
             }
+            .setOnCancelListener {
+                // 다이얼로그 취소시 스와이프 되돌리기
+                adapter.notifyItemChanged(adapter.currentList.indexOf(packageItem))
+            }
+            .show()
     }
 
-    override fun onResume() {
-        super.onResume()
-        // 다른 화면에서 돌아올 때 데이터 새로고침
-        if (boxId.isNotEmpty()) {
-            loadPackages()
-        }
+    private fun getCurrentBoxId(): String {
+        // 현재 선택된 박스 ID 가져오기 로직
+        return "current_box_id"
     }
 
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
 }

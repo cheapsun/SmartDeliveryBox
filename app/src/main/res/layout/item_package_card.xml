@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
+    app:strokeWidth="0dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <!-- 상태 아이콘 -->
+        <ImageView
+            android:id="@+id/status_icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_package"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- 상태 배지 -->
+        <TextView
+            android:id="@+id/status_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="배송중"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/white"
+            android:background="@drawable/rounded_background"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
+            android:layout_marginStart="12dp"
+            app:layout_constraintStart_toEndOf="@id/status_icon"
+            app:layout_constraintTop_toTopOf="@id/status_icon"
+            app:layout_constraintBottom_toBottomOf="@id/status_icon" />
+
+        <!-- 등록일 -->
+        <TextView
+            android:id="@+id/tv_registered_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="오늘"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            app:layout_constraintEnd_toStartOf="@id/btn_quick_action"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- 퀵 액션 버튼 -->
+        <ImageButton
+            android:id="@+id/btn_quick_action"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_more_vert"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- 운송장 번호 -->
+        <TextView
+            android:id="@+id/tv_tracking_number"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="1234 5678 9012"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:layout_marginTop="12dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/status_icon" />
+
+        <!-- 택배사 -->
+        <TextView
+            android:id="@+id/tv_courier_company"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="CJ대한통운"
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginTop="4dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_tracking_number" />
+
+        <!-- 상품명 -->
+        <TextView
+            android:id="@+id/tv_item_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="애플 맥북 프로"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginTop="4dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_courier_company" />
+
+        <!-- 메모 -->
+        <TextView
+            android:id="@+id/tv_memo"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="메모 내용"
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:background="@drawable/memo_background"
+            android:padding="8dp"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_item_name" />
+
+        <!-- 진행률 표시 -->
+        <ProgressBar
+            android:id="@+id/progress_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="4dp"
+            android:max="100"
+            android:progress="50"
+            android:layout_marginTop="12dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_memo" />
+
+        <!-- 자동 등록 표시 -->
+        <ImageView
+            android:id="@+id/iv_auto_detected"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_auto"
+            android:tint="@color/primary_blue"
+            android:visibility="gone"
+            android:layout_marginTop="8dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/progress_bar" />
+
+        <TextView
+            android:id="@+id/tv_auto_detected"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="자동 등록"
+            android:textSize="12sp"
+            android:textColor="@color/primary_blue"
+            android:layout_marginStart="4dp"
+            android:visibility="gone"
+            app:layout_constraintStart_toEndOf="@id/iv_auto_detected"
+            app:layout_constraintTop_toTopOf="@id/iv_auto_detected"
+            app:layout_constraintBottom_toBottomOf="@id/iv_auto_detected" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView>
