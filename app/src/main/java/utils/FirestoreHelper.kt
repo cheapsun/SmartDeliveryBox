@@ -1,7 +1,7 @@
 package utils
 
 import android.util.Log
-import com.example.deliverybox.model.UserData
+import com.example.deliverybox.core.UserData
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -197,7 +197,8 @@ object FirestoreHelper {
                 }
 
             // 수정된 UserData 객체 생성 (모든 인자 전달 또는 명명된 매개변수 사용)
-            callback(UserData(
+            callback(
+                UserData(
                 uid = uid,
                 email = email,
                 displayName = displayName,
@@ -206,7 +207,8 @@ object FirestoreHelper {
                 boxAliases = boxAliases,
                 mainBoxId = mainBoxId,
                 isPasswordSet = isPasswordSet
-            ))
+            )
+            )
         } catch (e: Exception) {
             Log.e(TAG, "사용자 데이터 파싱 실패: $uid, 오류: ${e.message}")
             callback(null)

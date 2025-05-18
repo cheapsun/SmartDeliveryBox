@@ -1,6 +1,6 @@
 package com.example.deliverybox.repository
 
-import com.example.deliverybox.model.UserData
+import com.example.deliverybox.core.UserData
 import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {

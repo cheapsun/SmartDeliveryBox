@@ -1,4 +1,4 @@
-package com.example.deliverybox
+package com.example.deliverybox.core
 
 import android.content.Context
 import android.util.Log

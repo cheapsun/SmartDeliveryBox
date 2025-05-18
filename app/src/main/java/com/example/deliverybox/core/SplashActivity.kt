@@ -1,4 +1,4 @@
-package com.example.deliverybox
+package com.example.deliverybox.core
 
 import android.content.Intent
 import android.os.Bundle
@@ -16,7 +16,6 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.deliverybox.auth.EmailVerificationActivity
 import com.example.deliverybox.auth.LoginActivity
 import com.example.deliverybox.auth.SignupPasswordActivity
-import com.example.deliverybox.home.MainActivity
 
 class SplashActivity : AppCompatActivity() {
 

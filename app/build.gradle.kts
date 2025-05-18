@@ -54,6 +54,8 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.lifecycle:lifecycle-process:2.6.2")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
     // 보안 관련 라이브러리
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.security:security-crypto-ktx:1.1.0-alpha06")

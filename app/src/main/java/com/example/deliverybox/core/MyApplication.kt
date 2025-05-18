@@ -1,4 +1,4 @@
-package com.example.deliverybox
+package com.example.deliverybox.core
 
 import android.app.Application
 import android.app.NotificationChannel
@@ -14,6 +14,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.example.deliverybox.R
 import com.example.deliverybox.auth.SignupPasswordActivity
 import com.example.deliverybox.utils.AccountUtils
 import com.google.firebase.FirebaseApp

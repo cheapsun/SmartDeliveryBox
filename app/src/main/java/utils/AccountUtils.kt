@@ -2,7 +2,7 @@ package com.example.deliverybox.utils
 
 import android.content.Context
 import android.util.Log
-import com.example.deliverybox.MyApplication
+import com.example.deliverybox.core.MyApplication
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore

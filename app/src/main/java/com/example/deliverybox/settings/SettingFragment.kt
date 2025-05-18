@@ -13,7 +13,7 @@ import androidx.cardview.widget.CardView
 import androidx.fragment.app.Fragment
 import com.example.deliverybox.shareduser.AddSharedUserActivity
 import com.example.deliverybox.shareduser.SharedUserManageActivity
-import com.example.deliverybox.SplashActivity
+import com.example.deliverybox.core.SplashActivity
 import com.example.deliverybox.databinding.FragmentSettingBinding
 import com.example.deliverybox.profile.ProfileActivity
 import com.example.deliverybox.utils.SharedPrefsHelper

@@ -4,14 +4,13 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.deliverybox.home.MainActivity
+import com.example.deliverybox.core.MainActivity
 import com.example.deliverybox.databinding.ActivityRegisterBoxBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import java.util.UUID
-import com.example.deliverybox.box.QrCodeValidationService
 import android.content.Context
 import android.view.inputmethod.InputMethodManager
 import androidx.lifecycle.lifecycleScope

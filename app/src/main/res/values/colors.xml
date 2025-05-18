@@ -32,6 +32,11 @@
     <color name="transparent_black">#80000000</color>
     <color name="transparent_blue">#4000A8FF</color>
 
+    <!-- 새로 추가되는 색상들 -->
+    <color name="main_box_background">#F3F6FF</color>
+    <color name="status_locked">#FF5722</color>
+    <color name="status_unlocked">#4CAF50</color>
+
     <color name="red">#D32F2F</color>
     <color name="doorlock_icon_red">#FF4444</color>
     <color name="gray_tint">#CCCCCC</color>

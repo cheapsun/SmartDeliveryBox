@@ -20,7 +20,7 @@ import com.example.deliverybox.utils.AccountUtils
 import com.example.deliverybox.utils.PasswordStrengthEvaluator
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.launch
-import com.example.deliverybox.home.MainActivity
+import com.example.deliverybox.core.MainActivity
 
 class SignupPasswordActivity : AppCompatActivity() {
 

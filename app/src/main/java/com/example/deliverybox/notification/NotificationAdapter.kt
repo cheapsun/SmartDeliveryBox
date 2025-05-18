@@ -1,4 +1,4 @@
-package adapter
+package com.example.deliverybox.notification
 
 import android.view.LayoutInflater
 import android.view.View

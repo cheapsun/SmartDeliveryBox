@@ -10,7 +10,6 @@ import android.widget.LinearLayout
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import adapter.NotificationAdapter
 import com.example.deliverybox.R
 import com.example.deliverybox.model.Notification
 import com.example.deliverybox.model.NotificationType

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/action_toggle_main_box"
+        android:title="메인 택배함으로 설정"
+        android:icon="@drawable/ic_star" />
+
+    <item
+        android:id="@+id/action_unregister_box"
+        android:title="등록 해제"
+        android:icon="@drawable/ic_delete" />
+
+</menu>

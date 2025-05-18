@@ -19,7 +19,7 @@ import com.example.deliverybox.repository.FirebaseAuthRepository
 import com.example.deliverybox.utils.SharedPrefsHelper
 import kotlinx.coroutines.launch
 import com.example.deliverybox.R
-import com.example.deliverybox.home.MainActivity
+import com.example.deliverybox.core.MainActivity
 
 class LoginActivity : AppCompatActivity() {
 

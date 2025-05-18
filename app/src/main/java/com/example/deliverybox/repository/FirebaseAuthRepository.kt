@@ -1,6 +1,6 @@
 package com.example.deliverybox.repository
 
-import com.example.deliverybox.model.UserData
+import com.example.deliverybox.core.UserData
 import com.example.deliverybox.utils.FirebaseAuthExceptionMapper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import java.security.SecureRandom
-import java.util.Base64
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine

@@ -1,4 +1,4 @@
-package adapter
+package com.example.deliverybox.delivery
 
 import android.view.LayoutInflater
 import android.view.View
@@ -6,7 +6,6 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.deliverybox.R
-import com.example.deliverybox.delivery.PackageItem
 
 class PackageAdapter(
     private val packageList: List<PackageItem>,

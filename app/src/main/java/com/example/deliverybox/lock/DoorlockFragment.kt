@@ -16,7 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import adapter.LogAdapter
 import com.example.deliverybox.R
-import com.example.deliverybox.box.BoxInfo
+import com.example.deliverybox.box.DeliveryBox
 import adapter.LogItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -40,7 +40,7 @@ class DoorlockFragment : Fragment() {
 
     private lateinit var logAdapter: LogAdapter
     private val logsList = mutableListOf<LogItem>()
-    private val boxesList = mutableListOf<BoxInfo>()
+    private val boxesList = mutableListOf<DeliveryBox>()
 
     private val auth by lazy { FirebaseAuth.getInstance() }
     private val db by lazy { FirebaseFirestore.getInstance() }
@@ -232,7 +232,7 @@ class DoorlockFragment : Fragment() {
                                 val boxName = boxDoc.getString("boxName") ?: "택배함"
 
                                 boxesList.add(
-                                    BoxInfo(
+                                    DeliveryBox(
                                     boxId = boxId,
                                     alias = alias,
                                     boxName = boxName

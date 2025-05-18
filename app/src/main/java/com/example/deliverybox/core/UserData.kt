@@ -1,4 +1,4 @@
-package com.example.deliverybox.model
+package com.example.deliverybox.core
 
 data class UserData(
     val uid: String,
