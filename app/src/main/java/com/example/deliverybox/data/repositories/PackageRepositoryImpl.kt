@@ -6,6 +6,8 @@ import com.example.deliverybox.delivery.DeliveryStatus
 import com.example.deliverybox.delivery.DeliveryStep
 import com.example.deliverybox.data.local.dao.PackageDao
 import com.example.deliverybox.data.local.entity.PackageEntity
+import com.example.deliverybox.data.local.mapper.toPackageInfo
+import com.example.deliverybox.data.local.mapper.toEntity
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.Flow
@@ -430,12 +432,12 @@ class PackageRepositoryImpl @Inject constructor(
     private fun convertEntityToPackageInfo(entity: PackageEntity): PackageInfo {
         // Room Entity -> PackageInfo 변환
         // 실제 구현시 entity.toPackageInfo() 확장 함수 사용
-        throw NotImplementedError("Use mapper extension function")
+        return entity.toPackageInfo()
     }
 
     private fun convertPackageInfoToEntity(packageInfo: PackageInfo): PackageEntity {
         // PackageInfo -> Room Entity 변환
         // 실제 구현시 packageInfo.toEntity() 확장 함수 사용
-        throw NotImplementedError("Use mapper extension function")
+        return packageInfo.toEntity()
     }
 }

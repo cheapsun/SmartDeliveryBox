@@ -3,18 +3,20 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/action_refresh"
+        android:icon="@drawable/ic_auto"
+        android:title="새로고침"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/action_edit"
+        android:icon="@drawable/ic_baseline_edit_24"
         android:title="편집"
         app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/action_mark_received"
-        android:title="수령 확인"
-        app:showAsAction="ifRoom" />
-
-    <item
-        android:id="@+id/action_refresh"
-        android:title="새로고침"
+        android:title="수령 완료"
         app:showAsAction="never" />
 
     <item

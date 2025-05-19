@@ -1,5 +1,6 @@
 package com.example.deliverybox.delivery
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.*
@@ -15,6 +16,7 @@ import com.example.deliverybox.delivery.adapter.PackageItem
 import com.example.deliverybox.delivery.swipe.PackageSwipeCallback
 import utils.StateViewHelper
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.firebase.auth.FirebaseAuth
 
 class PackageFragment : Fragment() {
 
@@ -181,7 +183,19 @@ class PackageFragment : Fragment() {
     }
 
     private fun getCurrentBoxId(): String {
-        return "current_box_id"
+        // 현재 사용자의 메인 박스 ID를 가져오는 로직
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return ""
+
+        // SharedPrefs에서 임시로 저장된 boxId가 있다면 사용
+        val sharedPrefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        val savedBoxId = sharedPrefs.getString("current_box_id", "")
+
+        return if (savedBoxId.isNullOrEmpty()) {
+            // boxId가 없다면 빈 문자열 반환 (빈 상태 표시됨)
+            ""
+        } else {
+            savedBoxId
+        }
     }
 
     override fun onDestroyView() {

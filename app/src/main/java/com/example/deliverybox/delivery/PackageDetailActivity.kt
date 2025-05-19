@@ -4,11 +4,16 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.deliverybox.R
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -21,9 +26,7 @@ class PackageDetailActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // 임시 레이아웃 설정 (실제 레이아웃이 없을 때)
-        setContentView(android.R.layout.activity_list_item)
+        setContentView(R.layout.activity_package_detail)
 
         // Intent에서 데이터 추출
         boxId = intent.getStringExtra("boxId") ?: ""
@@ -36,6 +39,7 @@ class PackageDetailActivity : AppCompatActivity() {
         }
 
         setupActionBar()
+        setupViews()
         setupObservers()
 
         // 패키지 상세 정보 로드
@@ -50,11 +54,29 @@ class PackageDetailActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupViews() {
+        // 뒤로가기 버튼
+        findViewById<MaterialToolbar>(R.id.toolbar).setNavigationOnClickListener {
+            finish()
+        }
+
+        // 수령 완료 버튼
+        findViewById<MaterialButton>(R.id.btn_mark_received).setOnClickListener {
+            showReceiveConfirmDialog()
+        }
+
+        // 택배사 추적 버튼
+        findViewById<MaterialButton>(R.id.btn_track_courier).setOnClickListener {
+            // 택배사 홈페이지 열기 (나중에 구현)
+            Toast.makeText(this, "택배사 홈페이지 연결 예정", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun setupObservers() {
         // 패키지 정보 관찰
         viewModel.packageInfo.observe(this) { packageInfo ->
             packageInfo?.let {
-                // TODO: UI 업데이트 (레이아웃 파일이 있을 때 구현)
+                updatePackageInfo(it)
                 supportActionBar?.subtitle = it.trackingNumber
             }
         }
@@ -63,16 +85,17 @@ class PackageDetailActivity : AppCompatActivity() {
         viewModel.uiState.observe(this) { state ->
             when (state) {
                 is PackageDetailUiState.Loading -> {
-                    // TODO: 로딩 표시
+                    findViewById<ProgressBar>(R.id.progress_loading).visibility = View.VISIBLE
                 }
                 is PackageDetailUiState.Success -> {
-                    // TODO: 성공 처리
+                    findViewById<ProgressBar>(R.id.progress_loading).visibility = View.GONE
                 }
                 is PackageDetailUiState.Error -> {
+                    findViewById<ProgressBar>(R.id.progress_loading).visibility = View.GONE
                     Toast.makeText(this, state.message, Toast.LENGTH_LONG).show()
                 }
                 is PackageDetailUiState.Idle -> {
-                    // TODO: 초기 상태 처리
+                    findViewById<ProgressBar>(R.id.progress_loading).visibility = View.GONE
                 }
             }
         }
@@ -95,6 +118,13 @@ class PackageDetailActivity : AppCompatActivity() {
                 viewModel.clearOperationResult()
             }
         }
+    }
+
+    private fun updatePackageInfo(packageInfo: PackageInfo) {
+        findViewById<TextView>(R.id.tv_tracking_number).text = packageInfo.getFormattedTrackingNumber()
+        findViewById<TextView>(R.id.tv_courier_company).text = packageInfo.courierCompany
+        findViewById<TextView>(R.id.tv_item_name).text = packageInfo.itemName ?: "상품명 없음"
+        findViewById<TextView>(R.id.tv_status).text = "${packageInfo.status.getEmoji()} ${packageInfo.status.toKorean()}"
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
